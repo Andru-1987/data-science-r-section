@@ -1,0 +1,355 @@
+---
+title: "Manipulación de datos con R"
+output: html_notebook
+---
+
+```{r}
+data("airquality")
+```
+
+```{r}
+airquality
+```
+
+
+```{r}
+summary(airquality)
+```
+
+# Crear filtros
+
+## Selección mediante un vector lógico
+
+```{r}
+selector <- airquality$Month == 5
+mayo <- airquality[selector,]
+
+junio <- airquality[airquality$Month==6,]
+
+mayo
+junio
+```
+
+
+# Función subset()
+
+> subset(x=, subset=, select=)
+
+Los parámetros de esta función son:
+
+-   `x` indica el nombre del data frame al que queremos aplicar el filtro
+-   `subset` es una expresión lógica que indica las filas que queremos conservar
+-   `select` es un vector indicando los nombres de las columnas que queremos conservar
+
+```{r}
+julio <- subset(x=airquality,
+                select = -c(Month,Day, Temp),#seleccionamos un grupo de columnas
+                subset= Month==7) #seleccionamos las filas donde el mes es julio
+julio
+```
+
+# Selecciones aleatorias
+
+> sample(x=, size=, replace=)
+
+-   `x` vector de donde obtener las muestras
+-   `size` tamaño de la muestra seleccionada
+-   `replace` es un vector lógico que indica si la muestra es con reposición. Si es *FALSE* los elementos pueden ser seleccionados una sola vez. Si es *TRUE* los elementos pueden ser seleccionados repetidas veces.
+
+```{r}
+sample(x=1:6, size = 5, replace = TRUE) 
+```
+
+```{r}
+# 1. Calcula el número total de filas en el dataframe airquality y almacena ese valor en la variable filas.
+filas <- nrow(airquality)
+
+# 2. Genera una muestra aleatoria de índices de fila, seleccionando el 60% de las filas sin reemplazo.
+muestra <- sample(x = 1:filas, size = filas * 0.6, replace = FALSE)
+
+# 3. Crea un nuevo dataframe llamado training, tomando las filas seleccionadas aleatoriamente (muestra) del dataframe original airquality.
+training <- airquality[muestra,]
+
+muestra
+training
+
+```
+
+```{r}
+testing <- airquality[-muestra,]
+testing
+```
+
+## Filtrando con un vector lógico / TAREA
+
+> rbinom(n=, size=, prob=)
+
+-   `n` número de observaciones
+-   `size` es el número de tiradas
+-   `prob` es la probabilidad que tiene el 1 de aparecer
+
+En resumen, esta línea de código crea un vector de valores binarios donde cada elemento indica si la fila correspondiente en airquality ha sido seleccionada (con probabilidad 0.5) o no. Luego, este vector se utiliza como índice para seleccionar las filas correspondientes en airquality y formar los conjuntos datosSeleccion y datosNoSeleccion.
+
+```{r}
+# 1. Genera una secuencia de números binarios (0 y 1) de longitud igual al número de filas en el dataframe airquality.
+seleccion <- rbinom(n = nrow(airquality), size = 1, prob = 0.5) == 1
+
+# 2. Crea un nuevo dataframe llamado datosSeleccion incluyendo solo las filas donde la condición en 'seleccion' es verdadera.
+datosSeleccion <- airquality[seleccion,]
+
+# 3. Crea un nuevo dataframe llamado datosNoSeleccion incluyendo solo las filas donde la condición en 'seleccion' es falsa.
+datosNoSeleccion <- airquality[!seleccion,]
+datosSeleccion 
+datosNoSeleccion
+
+
+```
+
+# Ordenamiento
+
+> order(x, na.last = TRUE, decreasing = FALSE)
+
+-   `x` es una secuencia de valores o un vector/es. Si presentamos más de un vector todos ellos deben ser de la misma longitud.
+-   `decreasing` valores lógicos que determinan si el ordenamiento debe realizarse en forma decreciente (TRUE ordena en forma decreciente).
+-   `na.last` si es *=TRUE* los valores faltantes son ordenados últimos en el ordenamiento. Si toma valor *=NA* entonces los valores faltantes se remueven.
+
+```{r}
+datos <- data.frame(cliente=c(1,2,3,4,5,6, 7), 
+                    zona = c(1,1,1,2,2,2, 3),
+                    monto = c(50, 200, 100, 150, 350, 250,NA))
+
+orden <- order(x=datos$monto, decreasing = TRUE, na.last = TRUE)
+
+datosOrdenados <- datos[orden,]
+
+datosOrdenados
+```
+
+
+```{r}
+# Excluir las filas que contienen NA
+datosSinNA <- na.omit(datosOrdenados)
+
+# Mostrar el resultado
+print(datosSinNA)
+```
+
+## Ordenar por más de una variable / TAREA
+
+```{r}
+
+# Ordena los datos primero por la columna 'zona' de manera ascendente (F) y luego por la columna 'monto' de manera descendente (T).
+
+# Los valores NA se colocarán al final debido a 'na.last = NA'.
+
+orden <- order(datos$zona, datos$monto, decreasing = c(F,T), na.last = NA)
+
+datosOrdenados <- datos[orden,]
+
+datosOrdenados
+```
+
+# Variables condicionales. Uso de la función ifelse()
+
+> ifelse(condición, Valor_si_verdadero, valor_si_falso) 77.88
+
+```{r}
+# Calcula la media de la columna 'Temp' en el dataframe 'airquality' y almacena el resultado en la variable 'media'.
+media <- mean(x = airquality$Temp)
+
+# Imprime el valor de la media calculada.
+print(media)
+
+# Crea una nueva columna llamada 'mayor' en el dataframe 'airquality' que tiene 1 si el valor en 'Temp' es mayor que la media, y 0 en caso contrario.
+airquality$mayor <- ifelse(airquality$Temp > media, 1, 0)
+
+
+airquality
+
+```
+
+# Cuidado con los missing / tarea
+
+```{r}
+# Calcula la media de la columna 'Ozone' en el dataframe 'airquality' y almacena el resultado en la variable 'mediaOzono'.
+mediaOzono <- mean(x = airquality$Ozone)
+
+# Calcula la media de la columna 'Ozone' en el dataframe 'airquality', ignorando los valores NA, y almacena el resultado en la variable 'mediaOzono'.
+mediaOzono <- mean(x = airquality$Ozone, na.rm = TRUE)
+
+# Crea una nueva columna llamada 'mayorOzono' en el dataframe 'airquality' que tiene 1 si el valor en 'Ozone' es mayor que la media, y 0 en caso contrario.
+airquality$mayorOzono <- ifelse(airquality$Ozone > mediaOzono, 1, 0)
+
+airquality$mayorOzono
+
+
+
+```
+
+
+
+# Construir resúmenes
+
+> aggregate(x = , by = , FUN = )
+
+-   `x` indica el nombre del objeto numérico (columna de un data frame) calculable para cada grupo
+-   `by` es una lista de las variables con las que queremos formar grupos
+-   `FUN` es una función que queremos aplicar para obtener los resultados
+
+```{r}
+maximos<-aggregate(x=airquality$Temp, by=list(airquality$Month), FUN=max )
+maximos
+
+prom<-aggregate(x=Ozone~Month, data=airquality, FUN = mean)
+prom
+
+```
+
+# La función ave() / tarea
+
+```{r}
+# Convierte airquality$Month a factor si aún no lo es
+airquality$Month <- factor(airquality$Month)
+
+# Usa la función ave() para calcular el máximo de Temp por cada valor en Month
+airquality$maximo <- ave(airquality$Temp, airquality$Month, FUN = max)
+
+airquality$maximo
+
+```
+
+# Familia apply / tarea
+
+```{r}
+tapply(
+  X = airquality$Temp,              # Vector de datos a ser analizado
+  INDEX = list(airquality$Month, airquality$Day),  # Lista de factores o índices que definen los grupos
+  FUN = mean                         # Función a aplicar a cada grupo
+)
+
+```
+
+> La función apply(x, MARGIN, FUN, ...)
+
+-   `X` es la matriz o DF sobre el la cual queremos aplicar cálculos
+-   `MARGIN` Puede tomar valores 1: Para calcular en filas; 2: Para calcular en columnas
+-   `FUN` Indicamos la función que queremos aplicar
+-   `...` argumentos adicionales a la función que queremos aplicar
+
+```{r}
+# Crear un dataframe 'df' con tres columnas: 'salario', 'comision' y 'bono'
+df <- data.frame(
+  salario = c(500, 600, 700, 1200),
+  comision = c(300, 100, 100, 0),
+  bono = c(100, 100, 100, 100)
+)
+
+# Aplicar la función sum() a cada fila del dataframe 'df', sumando los valores de cada columna
+# MARGIN = 1 indica que la operación se realiza a lo largo de las filas
+salarioTotal <- apply(df, MARGIN = 2, FUN = sum)
+salarioTotal
+
+```
+
+```{r}
+itemPromedio<-apply(df, MARGIN = 2, FUN=mean)
+itemPromedio
+```
+
+# Fusionar datos  / tarea
+
+# Construir variables dummies
+
+```{r}
+airquality$julio <- ifelse(airquality$Month==7, 1,0)
+airquality$julio 
+
+```
+
+```{r}
+# Obtiene los meses únicos presentes en la columna 'Month' del dataframe 'airquality'.
+meses <- unique(airquality$Month)
+meses
+```
+
+# Discretizar variables continuas / tarea opcional / dejar de ultimo 
+
+> cut(x=, breaks=, ...)
+
+Argumentos:
+
+-   `x` vector numérico que deseamos transformar a discreto
+-   `breaks` es un vector numérico indicando los puntos de corte o un valor indicando la cantidad de intervalos
+-   `labels` vector de nombres de los intervalos. Si toma el valor FALSE entonces le asigna un valor numérico secuencial.
+-   `include.lowest` Es un valor lógico indicando si el valor más bajo debe ser incluido en el primer rango.
+-   `right` es un valor lógico indicando si los intervalos deben ser cerrados a la derecha (abierto a la izquierda) o viceversa
+
+```{r}
+# Crea un vector de valores del 0 al 100.
+valores <- 0:100
+
+# Divide el vector 'valores' en intervalos (bins) utilizando la función cut().
+# La función cut() devuelve un factor que indica a qué intervalo pertenece cada valor.
+# En este caso, los intervalos son (0,32], (32,66], (66,100].
+valoresDisc <- cut(x = valores, breaks = c(0, 32, 66, 100), include.lowest = TRUE)
+
+# Crea un dataframe 'comprobar' con dos columnas: 'valores' y 'valoresDisc'.
+comprobar <- data.frame(valores, valoresDisc)
+
+comprobar
+{r}
+
+```
+
+# Normalizar variables  / tarea
+
+```{r}
+airquality$Viento <- (airquality$Wind - mean(airquality$Wind))/(sd(airquality$Wind))
+airquality$Temperatura <- (airquality$Temp - mean(airquality$Temp))/(sd(airquality$Temp))
+
+```
+
+# Escalar entre 0 y 1 / tarea
+
+```{r}
+# Normaliza la columna 'Wind' en el dataframe 'airquality' y crea una nueva columna 'Viento_' con los valores normalizados.
+airquality$Viento_ <- (airquality$Wind - min(airquality$Wind)) / (max(airquality$Wind) - min(airquality$Wind))
+
+# Normaliza la columna 'Temp' en el dataframe 'airquality' y crea una nueva columna 'Temperatura_' con los valores normalizados.
+airquality$Temperatura_ <- (airquality$Temp - min(airquality$Temp)) / (max(airquality$Temp) - min(airquality$Temp))
+
+```
+
+
+Tarea / investigar 
+```{r}
+estandarizado <- function(x){
+  resultado <- (x - mean(x))/(sd(x))
+  return(resultado)
+}
+
+escalado <- function(x){
+  resultado <- (x - min(x))/(max(x)-min(x))
+  return(resultado)
+}
+```
+
+# Valores faltantes
+
+```{r}
+# Identifica las posiciones en las que la columna 'Temp' tiene valores ausentes (NA).
+tempAusente <- is.na(airquality$Temp)
+
+# Calcula la cantidad total de valores ausentes en la columna 'Temp'.
+sum(tempAusente)
+
+# Identifica las posiciones en las que la columna 'Solar.R' tiene valores ausentes (NA).
+Solar.RAusente <- is.na(airquality$Solar.R)
+
+# Imprime el número de valores faltantes en la columna 'Solar.R'.
+cat("Existen", sum(Solar.RAusente), "valores faltantes")
+
+
+```
+
+
