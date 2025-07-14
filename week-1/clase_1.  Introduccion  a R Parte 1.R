@@ -1,5 +1,3 @@
-
-
 #Operaciones básicas con R
 
 suma <-3+5  #Sumamos
@@ -328,43 +326,3 @@ str(m)
 #install.packages("xlsx")
 
 #Función write.xlsx() para guardar datos en un archivo .xlsx
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
