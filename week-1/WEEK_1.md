@@ -28,6 +28,7 @@ En esta clase vamos a conocer el lenguaje, su historia, y su utilidad en ciencia
 ## ¿Qué es R?
 
 R es un lenguaje de programación orientado a estadísticas, análisis de datos y visualización.
+[Intro a R](https://talently.tech/blog/programacion-en-r/)
 
 ```r
 # Primer código en R
@@ -66,7 +67,7 @@ plot(edades, type = "b", col = "blue")
 ---
 
 # Recursos extra
-
+* [R Utilidades](https://libraryguides.mcgill.ca/c.php?g=699776&p=4968544)
 * [RStudio](https://www.rstudio.com/)
 * [R for Data Science](https://r4ds.had.co.nz/)
 * [R ata Types](https://swcarpentry.github.io/r-novice-inflammation/13-supp-data-structures.html)
