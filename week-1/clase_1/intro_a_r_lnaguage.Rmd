@@ -1,0 +1,601 @@
+---
+title: "Introducción a R: De lo Básico a lo Avanzado"
+author: "Tu Nombre"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    highlight: tango
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# 1. Introducción a R
+
+R es un lenguaje de programación y entorno estadístico muy poderoso para análisis de datos, visualización y computación estadística. En este curso aprenderemos desde los conceptos básicos hasta técnicas más avanzadas.
+
+## ¿Por qué usar R?
+- Es gratuito y de código abierto
+- Tiene una gran comunidad de usuarios
+- Excelente para análisis estadístico y visualización
+- Miles de paquetes disponibles
+
+---
+
+# 2. Operaciones Básicas en R
+
+## 2.1 Operaciones Aritméticas
+
+R puede utilizarse comme una calculadora avanzada. Veamos las operaciones básicas:
+
+```{r operaciones-basicas}
+# Operaciones básicas
+suma <- 3 + 5      # Suma
+print(suma)
+
+3 - 2              # Resta
+3 / 2              # División
+3 * 2              # Multiplicación
+3^2                # Potencia (forma 1)
+3**2               # Potencia (forma 2)
+9 %% 4             # Operador módulo (resto de la división)
+```
+
+## 2.2 Precedencia de Operadores
+
+Es importante entender el orden en que R evalúa las operaciones:
+
+1. Paréntesis
+2. Potencias
+3. Multiplicación y División
+4. Suma y Resta
+
+```{r precedencia}
+# Sin paréntesis: primero multiplicación, luego suma
+3 + 2 * 5
+
+# Con paréntesis: primero suma, luego multiplicación
+(3 + 2) * 5
+
+# Ejemplo con potencias
+2 / 8**2
+```
+
+---
+
+# 3. Variables y Tipos de Datos
+
+## 3.1 Creación de Variables
+
+En R usamos el operador `<-` para asignar valores a variables:
+
+```{r variables}
+# Diferentes tipos de variables
+a <- 10                    # Variable numérica
+A <- "2"                   # Variable de caracteres (string)
+b <- TRUE                  # Variable lógica (booleana)
+c <- Sys.Date()            # Variable de fecha
+
+# Ver todas las variables en memoria
+ls()
+```
+
+## 3.2 Explorar la Estructura de los Datos
+
+```{r estructura}
+# Investigar la estructura de nuestras variables
+str(a)      # Estructura de variable numérica
+str(A)      # Estructura de variable character
+str(b)      # Estructura de variable lógica
+str(c)      # Estructura de variable Date
+
+# También podemos usar class() para ver el tipo
+class(a)
+class(A)
+class(b)
+class(c)
+```
+
+---
+
+# 4. Vectores: La Base de R
+
+Los vectores son la estructura de datos más básica en R. Todos los elementos deben ser del mismo tipo.
+
+## 4.1 Creación de Vectores
+
+```{r vectores-creacion}
+# Crear vectores con la función c()
+vector_numerico <- c(1, 2, 3, 4)
+print(vector_numerico)
+
+# Concatenar vectores existentes
+nuevo_vector <- c(vector_numerico, 7, 8, 9)
+print(nuevo_vector)
+
+# Otra forma de concatenar
+a <- c(1, 2, 6)
+b <- c(4, 5)
+c <- c(a, b)
+print(c)
+```
+
+## 4.2 Operaciones con Vectores
+
+```{r operaciones-vectores}
+# Operaciones con un escalar
+a <- c(1, 2, 3, 4)
+a + 3    # Suma 3 a cada elemento
+a^2      # Eleva cada elemento al cuadrado
+
+# Operaciones entre vectores del mismo tamaño
+vector1 <- 1:3           # Equivale a c(1, 2, 3)
+vector2 <- c(4, 5, 6)
+vector1 + vector2        # Suma elemento por elemento
+vector1 * vector2        # Multiplicación elemento por elemento
+```
+
+## 4.3 Vectores de Diferente Longitud
+
+```{r vectores-diferentes}
+# ¿Qué pasa con vectores de diferente longitud?
+a <- c(1:4)              # c(1, 2, 3, 4)
+b <- c(1, -1)            # Vector de 2 elementos
+
+# R recicla el vector más corto
+resultado <- a * b
+print(resultado)
+
+# Cuando no son múltiplos, R da una advertencia
+b <- c(1, -1, 0)         # 3 elementos
+a * b                    # 4 no es múltiplo de 3
+```
+
+## 4.4 Comparaciones y Secuencias
+
+```{r comparaciones-secuencias}
+# Comparar vectores elemento por elemento
+a <- c(1, 2, 3, 4)
+b <- c(1, 2, 4, 3)
+a == b
+
+# Crear vectores con caracteres
+saludo <- c("hola", "mundo")
+print(saludo)
+
+# La función seq() para crear secuencias
+seq(from = 1, to = 7, by = 2)    # De 1 a 7, de 2 en 2
+seq(1, 10, by = 3)               # De 1 a 10, de 3 en 3
+
+# Formas equivalentes de crear secuencias
+secuencia1 <- seq(1, 4)          # seq con incremento de 1
+secuencia2 <- c(1, 2, 3, 4)      # vector manual
+secuencia3 <- 1:4                # notación de rango
+
+identical(secuencia1, secuencia3)
+```
+
+## 4.5 Funciones Útiles para Vectores
+
+```{r funciones-vectores}
+vector_ejemplo <- c(1:5)
+
+length(vector_ejemplo)    # Longitud del vector
+sum(vector_ejemplo)       # Suma de todos los elementos
+mean(vector_ejemplo)      # Media aritmética
+median(vector_ejemplo)    # Mediana
+sd(vector_ejemplo)        # Desviación estándar
+```
+
+## 4.6 Acceso a Elementos
+
+```{r acceso-elementos}
+# Crear un vector de ejemplo
+mi_vector <- c(3, 28, 1, 15, 7)
+
+# Acceder a un elemento por su posición
+segundo_elemento <- mi_vector[2]
+print(segundo_elemento)
+
+# Operaciones con elementos específicos
+resultado <- mi_vector[2] * 8
+print(resultado)
+
+# Modificar elementos
+mi_vector[2] <- 99
+print(mi_vector)
+
+# Acceder a múltiples elementos
+mi_vector[c(1, 3)] <- 999
+print(mi_vector)
+```
+
+---
+
+# 5. Matrices: Datos en Dos Dimensiones
+
+Las matrices son arreglos bidimensionales donde todos los elementos deben ser del mismo tipo.
+
+## 5.1 Creación de Matrices
+
+```{r matrices-creacion}
+# Crear una matriz de ceros
+matriz_ceros <- matrix(data = 0, nrow = 5, ncol = 4)
+print(matriz_ceros)
+
+# Crear una matriz con datos
+matriz_datos <- matrix(data = 20:1, nrow = 5, ncol = 4)
+print(matriz_datos)
+```
+
+## 5.2 Nombrar Filas y Columnas
+
+```{r matrices-nombres}
+# Asignar nombres a columnas y filas
+colnames(matriz_datos) <- c("C1", "C2", "C3", "C4")
+rownames(matriz_datos) <- c("F1", "F2", "F3", "F4", "F5")
+print(matriz_datos)
+```
+
+## 5.3 Acceso y Modificación de Elementos
+
+```{r matrices-acceso}
+# Acceder a un elemento específico [fila, columna]
+elemento <- matriz_datos[1, 2]
+print(paste("Elemento en fila 1, columna 2:", elemento))
+
+# Acceder a columnas completas
+segunda_columna <- matriz_datos[, 2]
+print("Segunda columna:")
+print(segunda_columna)
+
+# Acceder a filas completas
+primera_fila <- matriz_datos[1, ]
+print("Primera fila:")
+print(primera_fila)
+
+# Modificar elementos
+matriz_datos[1, 2] <- matriz_datos[1, 2] * 3
+matriz_datos[, 2] <- c(0, 0, 0, 0, 9)
+
+# Modificar múltiples elementos
+matriz_datos[c(1, 3), c(2, 4)] <- 999
+print(matriz_datos)
+```
+
+---
+
+# 6. Data Frames: La Estructura Más Importante
+
+Los data frames pueden contener diferentes tipos de datos en diferentes columnas, similar a una hoja de cálculo.
+
+## 6.1 Creación de Data Frames
+
+```{r dataframes-creacion}
+# Crear data frame a partir de vectores
+numeros <- c(1, 2, 3, 4, 5)
+letras <- c("A", "B", "C", "D", "E")
+df <- data.frame(numeros = numeros, letras = letras)
+
+# O de forma directa
+df <- data.frame(
+  numeros = c(1, 2, 3, 4, 5),
+  letras = c("A", "B", "C", "D", "E")
+)
+
+print(df)
+```
+
+## 6.2 Explorar Data Frames
+
+```{r dataframes-exploracion}
+# Dimensiones del data frame
+nrow(df)        # Número de filas
+ncol(df)        # Número de columnas
+dim(df)         # Dimensiones (filas, columnas)
+
+# Nombres
+colnames(df)    # Nombres de columnas
+rownames(df)    # Nombres de filas
+names(df)       # Nombres de columnas (alternativo)
+
+# Resumen estadístico
+summary(df)
+```
+
+## 6.3 Agregar Columnas
+
+```{r dataframes-agregar}
+# Agregar columna desde un vector existente
+meses <- c("Enero", "Febrero", "Marzo", "Abril", "Mayo")
+df$Meses <- meses
+
+# Agregar columna directamente
+df$meses_cortos <- c("Ene", "Feb", "Mar", "Abr", "May")
+
+# Crear columna a partir de operaciones
+df$division <- df$numeros / 3
+
+print(df)
+```
+
+## 6.4 Unir Data Frames
+
+```{r dataframes-unir}
+# Usar cbind() para unir por columnas
+nuevos_valores <- c(100, 200, 300, 400, 500)
+df_expandido <- cbind(df, cientos = nuevos_valores)
+
+# Agregar más columnas
+df_expandido$años <- 2000:2004
+
+print(df_expandido)
+```
+
+---
+
+# 7. Importar y Exportar Datos
+
+## 7.1 Guardar Data Frames
+
+```{r eval=FALSE}
+# Guardar en archivo CSV
+write.table(x = df, file = "mi_dataframe.csv", sep = ";")
+
+# O usando write.csv
+write.csv(df, "mi_dataframe.csv", row.names = FALSE)
+```
+
+## 7.2 Leer Archivos
+
+```{r eval=FALSE}
+# Leer archivo CSV
+datos_importados <- read.csv("mi_dataframe.csv", sep = ";")
+
+# Verificar directorio de trabajo
+getwd()
+
+# Cambiar directorio de trabajo
+# setwd("ruta/a/tu/directorio")
+```
+
+---
+
+# 8. Listas: Contenedores Flexibles
+
+Las listas pueden contener diferentes tipos de objetos: números, caracteres, vectores, matrices, incluso otras listas.
+
+## 8.1 Creación y Manipulación de Listas
+
+```{r listas}
+# Crear una lista con diferentes tipos de datos
+mi_lista <- list(1, "texto", Sys.Date(), TRUE)
+str(mi_lista)
+
+# Acceder a elementos de la lista
+mi_lista[1]     # Devuelve una lista con el primer elemento
+mi_lista[[1]]   # Devuelve el valor del primer elemento
+
+# Longitud de la lista
+length(mi_lista)
+
+# Agregar elementos
+mi_lista <- c(mi_lista, "nuevo_elemento")
+
+# Lista con vectores
+lista_compleja <- list(
+  numeros = c(1, 2, 3),
+  texto = "hola",
+  fecha = Sys.Date(),
+  logico = TRUE
+)
+
+# Acceder a elemento específico de un vector dentro de la lista
+lista_compleja$numeros[2]    # Segundo elemento del vector 'numeros'
+lista_compleja[[1]][2]       # Forma alternativa
+```
+
+---
+
+# 9. Conversiones de Tipos de Datos
+
+R proporciona funciones para convertir entre diferentes tipos de datos.
+
+## 9.1 Funciones de Conversión Principales
+
+```{r conversiones}
+# Convertir string a fecha
+fecha_texto <- "2020-04-09"
+str(fecha_texto)
+
+fecha_date <- as.Date(fecha_texto)
+str(fecha_date)
+
+# Conversiones numéricas
+numero_texto <- "123"
+numero_numerico <- as.numeric(numero_texto)
+print(class(numero_numerico))
+
+# Conversión que genera NA
+texto_no_numerico <- "abc"
+resultado_na <- as.numeric(texto_no_numerico)
+print(resultado_na)
+```
+
+## 9.2 Convertir Data Frame a Matriz
+
+```{r conversion-matriz}
+# Usar el dataset integrado airquality
+datos <- airquality
+head(datos)     # Ver primeras 6 filas
+str(datos)      # Estructura del data frame
+
+# Convertir a matriz (solo funciona si todos los datos son numéricos)
+matriz_datos <- as.matrix(datos)
+matriz_datos[1:6, ]   # Ver primeras 6 filas
+str(matriz_datos)
+
+# Si agregamos una columna de texto, todo se convierte a character
+datos$categoria <- "A"
+head(datos)
+
+matriz_mixta <- as.matrix(datos)
+str(matriz_mixta)     # Ahora todo es character
+```
+
+---
+
+# 10. Funciones y Paquetes Esenciales
+
+## 10.1 Funciones del Paquete Base
+
+R viene con muchas funciones útiles incluidas:
+
+```{r funciones-base, eval=FALSE}
+# Filtrado de datos
+# subset(data, condition)
+
+# Ordenamiento
+# order(vector)
+
+# Números aleatorios
+# rnorm(n, mean, sd)    # Normal
+# runif(n, min, max)    # Uniforme
+# rbinom(n, size, prob) # Binomial
+
+# Condicionales
+# ifelse(test, yes, no)
+
+# Combinar data frames
+# merge(df1, df2, by = "columna")
+
+# Resúmenes agrupados
+# aggregate(formula, data, FUN)
+```
+
+## 10.2 Ejemplo de Números Aleatorios
+
+```{r numeros-aleatorios}
+# Generar números aleatorios
+set.seed(123)  # Para reproducibilidad
+
+# 10 números de distribución normal
+normales <- rnorm(10, mean = 0, sd = 1)
+print(normales)
+
+# 10 números uniformes entre 0 y 1
+uniformes <- runif(10, min = 0, max = 1)
+print(uniformes)
+
+# Histograma de números normales
+hist(rnorm(1000), main = "Distribución Normal", xlab = "Valores")
+```
+
+## 10.3 Gráficos Básicos
+
+```{r graficos-basicos}
+# Datos de ejemplo
+x <- 1:10
+y <- x^2
+
+# Gráfico de puntos
+plot(x, y, main = "Gráfico de Puntos", xlab = "X", ylab = "Y")
+
+# Histograma
+datos_hist <- rnorm(100)
+hist(datos_hist, main = "Histograma", xlab = "Valores")
+
+# Boxplot
+boxplot(datos_hist, main = "Boxplot")
+
+# Gráfico de barras
+categorias <- c("A", "B", "C", "D")
+valores <- c(23, 45, 56, 78)
+barplot(valores, names.arg = categorias, main = "Gráfico de Barras")
+```
+
+---
+
+# 11. Paquetes Adicionales
+
+## 11.1 Instalación de Paquetes
+
+```{r eval=FALSE}
+# Instalar paquetes (solo necesario una vez)
+install.packages("reshape2")
+install.packages("xlsx")
+install.packages("ggplot2")
+
+# Cargar paquetes (necesario en cada sesión)
+library(reshape2)
+library(xlsx)
+library(ggplot2)
+```
+
+## 11.2 Ejemplos de Uso
+
+```{r eval=FALSE}
+# reshape2: para manipulación de datos
+# melt() - convertir datos anchos a largos
+# dcast() - crear tablas pivot
+
+# xlsx: para trabajar con Excel
+# write.xlsx() - guardar en formato Excel
+# read.xlsx() - leer archivos Excel
+
+# ggplot2: para gráficos avanzados
+# ggplot() + geom_point() - gráficos de puntos elegantes
+# ggplot() + geom_bar() - gráficos de barras
+```
+
+---
+
+# 12. Ejercicios Prácticos
+
+## Ejercicio 1: Operaciones Básicas
+Crea dos vectores de 5 elementos cada uno y realiza todas las operaciones aritméticas básicas entre ellos.
+
+## Ejercicio 2: Data Frame
+Crea un data frame con información de 5 estudiantes (nombre, edad, calificación) y calcula la calificación promedio.
+
+## Ejercicio 3: Análisis Exploratorio
+Usa el dataset `mtcars` (incluido en R) para:
+- Ver sus dimensiones
+- Calcular estadísticas descriptivas
+- Crear un gráfico de dispersión entre dos variables
+
+```{r ejercicio-mtcars}
+# Cargar el dataset
+data(mtcars)
+
+# Explorar
+dim(mtcars)
+summary(mtcars)
+
+# Gráfico de dispersión
+plot(mtcars$wt, mtcars$mpg, 
+     main = "Peso vs Consumo de Combustible",
+     xlab = "Peso (1000 lbs)", 
+     ylab = "Millas por galón")
+```
+
+---
+
+# 13. Recursos Adicionales
+
+## Documentación y Ayuda
+- `help(funcion)` o `?funcion` - ayuda sobre una función específica
+- `example(funcion)` - ejemplos de uso
+- `help.search("tema")` - buscar ayuda sobre un tema
+
+## Sitios Web Útiles
+- [R Documentation](https://www.rdocumentation.org/)
+- [CRAN Task Views](https://cran.r-project.org/web/views/)
+- [Stack Overflow - R](https://stackoverflow.com/questions/tagged/r)
+
+---
