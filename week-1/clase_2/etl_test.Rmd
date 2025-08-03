@@ -203,7 +203,7 @@ agg_resultado <- iris_clean %>% group_by(Species) %>% summarise(media_Sepal_Leng
 agg_resultado
 ```
 
-```{r aggregation}
+```{R aggregation}
 agg_tbl <- iris_clean %>% group_by(Species) %>% summarise(across(c(Sepal_Length, Sepal_Width, Petalo_Largo_cm, Sepalo_Ratio),list(media = mean, sd = sd, min = min, max = max)))
 
 agg_tbl
@@ -211,7 +211,7 @@ agg_tbl
 
 ## 2.4 Visualizaciones
 ```{R plots, warning=FALSE}
-
+library(here)
 library(ggplot2)
 
 plot <- ggplot(iris_clean, aes(x = Petalo_Largo_cm, fill = Species)) + 
@@ -235,11 +235,7 @@ ggsave(local_storage, plot, width = 8, height = 5, dpi = 300)
 Un t-test, es una herramienta estadística utilizada para comparar las medias de dos grupos de datos y determinar si la diferencia entre ellos es estadísticamente significativa. En otras palabras, ayuda a decidir si la diferencia observada entre los grupos es real o simplemente resultado del azar.
 ### Explicación del Análisis t-test de una muestra
 
-#### **Código ejecutado:**
-```r
-versicolor <- filter(iris_clean, Species == "versicolor")
-t.test(versicolor$Sepal_Length, mu = 6)
-```
+
 1. **t = -0.87674**:  
    - Valor del estadístico t, que mide cuánto se desvía la media muestral del valor hipotético (6 cm), en unidades de error estándar.  
    - El signo negativo indica que la media muestral (5.936) es menor que 6.
@@ -291,30 +287,51 @@ ggsave(local_storage, plot, width = 8, height = 5, dpi = 300)
 
 ```
 
-```{r t-one-sample-iris}
-versicolor <- filter(iris_clean, Species == "versicolor")
+```{R t-one-sample-iris}
+
+versicolor <- dplyr::filter(iris_clean, Species == "versicolor")
+# dplyr::count(iris_clean, Species)
 t.test(versicolor$Sepal_Length, mu = 6)
 ```
 
 Interpretación: p-valor alto indica que no hay evidencia para rechazar la hipótesis nula de media = 6 cm.
 
 ## 3.2 Test t de Welch (comparación de largo de pétalos entre virginica y versicolor)
+El Test t de Welch es una variación del test t de dos muestras que:
+* No asume varianzas iguales entre los dos grupos (a diferencia del test t clásico de Student).
+* Es más robusto y confiable cuando las varianzas o los tamaños muestrales de los grupos son distintos.
 
-```{r welch-iris}
-virginica <- filter(iris_clean, Species == "virginica")
-t.test(virginica$Petalo_Largo_cm, versicolor$Petalo_Largo_cm,
-       alternative = "greater", var.equal = FALSE)
+Hipotesis a plantear
+_La media del largo de pétalo en virginica es menor o igual a la de versicolor._
+
+* Comparando la longitud del pétalo entre las especies virginica y versicolor.
+
+  - alternative = "greater" indica que se plantea una hipótesis unilateral: "La media del largo del pétalo en virginica es mayor que en versicolor".
+  - var.equal = FALSE fuerza el uso del test de Welch, que ajusta los grados de libertad automáticamente.
+```{R welch-iris}
+
+virginica <- dplyr::filter(iris_clean, Species == "virginica")
+
+t.test(virginica$Petalo_Largo_cm, versicolor$Petalo_Largo_cm, alternative = "greater", var.equal = FALSE)
+```
+
+```{R graph-medias-en-boxplots}
+library(ggplot2)
+
+# Filtrar solo las especies relevantes
+
+subset_iris <- dplyr::filter(iris_clean, Species %in% c("versicolor", "virginica"))
+
+ggplot(subset_iris, aes(x = Species, y = Petalo_Largo_cm, fill = Species)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = NA) +
+  geom_jitter(width = 0.15, alpha = 0.4, color = "black") +
+  stat_summary(fun = mean, geom = "point", shape = 20, size = 4, color = "red") +
+  theme_minimal() +
+  labs(title = "Comparación del Largo del Pétalo entre Species",
+       y = "Petalo Largo (cm)",
+       x = "") +
+  scale_fill_brewer(palette = "Set1")
+
 ```
 
 Interpretación: p-valor muy pequeño indica que virginica tiene pétalos significativamente más largos que versicolor.
-
-## 3.3 Test de proporciones (moneda hipotética)
-
-```{r prop-test}
-caras <- 530
-n <- 1000
-prop.test(caras, n, p = 0.5, correct = FALSE)
-```
-
-Interpretación: no hay evidencia suficiente para afirmar que la moneda esté sesgada.
-

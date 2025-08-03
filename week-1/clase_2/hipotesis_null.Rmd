@@ -1,0 +1,152 @@
+---
+title: "Hipótesis Nula (ejemplo base)"
+author: "Anderson Ocana"
+date: "`r Sys.Date()`"
+output: 
+   html_document:
+      toc: true
+      toc_float: true
+      theme: united
+      highlight: tango
+      code_folding: show
+---
+
+### ¿Qué es la hipótesis nula?
+
+Es una afirmación que se asume como cierta hasta que haya evidencia suficiente para negarla.
+Generalmente plantea que `no hay efecto`, `no hay diferencia` o `no hay relación` entre variables.
+
+Ejemplos:
+
+* "No hay diferencia en la tasa de conversión entre las dos versiones de una landing page."
+* "El nuevo tratamiento no mejora la salud comparado con el tratamiento estándar."
+* "El modelo de predicción no mejora respecto al azar."
+
+---
+
+### ¿Por qué es importante en un proyecto de DS?
+
+#### **Es la base del razonamiento estadístico**
+
+   * Todo test estadístico se construye alrededor de la hipótesis nula.
+   * Te permite usar pruebas objetivas (como t-test, chi-cuadrado, ANOVA, etc.) para evaluar si un resultado es `estadísticamente significativo` o puede explicarse por azar.
+
+#### **Evita conclusiones erróneas (falsos positivos)**
+
+   * Sin H₀, podrías interpretar cualquier diferencia o patrón como relevante, incluso si es producto del ruido.
+   * Al establecer una hipótesis nula, reduces el riesgo de cometer un **error tipo I** (rechazar H₀ cuando es cierta).
+
+#### **Permite diseñar experimentos y A/B tests**
+
+   * En marketing, productos o UX, los tests A/B usan H₀ para saber si un cambio tiene impacto real.
+   * Ejemplo: "H₀: la tasa de clics de la versión A es igual a la de la versión B."
+
+#### **Da un marco formal y comunicable**
+
+   * Al trabajar en equipos multidisciplinarios o con stakeholders, plantear una hipótesis nula da claridad: "esto es lo que estamos tratando de demostrar o refutar con los datos".
+
+#### **Conecta ciencia y negocio**
+
+   * Te ayuda a traducir preguntas de negocio a una forma cuantificable:
+        > "¿Funciona esta campaña?" → H₀: "No tiene efecto sobre las ventas".
+
+---
+
+### Conclusión
+
+La hipótesis nula **estructura tu análisis, disciplina tus conclusiones y te protege contra la sobreinterpretación de # Aunque no siempre se menciona explícitamente en modelos predictivos, sigue siendo clave en análisis exploratorios, evaluaciones de impacto, tests estadísticos y validaciones de hipótesis de negocio.
+
+
+## **Ejemplo: ¿Está sesgada una moneda?**
+
+### **Planteamiento del problema**
+
+Un investigador lanza una moneda 1.000 veces y obtiene 530 #Desea saber si esta diferencia respecto a la proporción esperada de 0,5 (es decir, 50% de caras) podría deberse al azar o si hay evidencia estadística suficiente para afirmar que la moneda está sesgada.
+
+### **Formulación de hipótesis**
+
+* **Hipótesis nula (H₀):** Detectar si tenemos un caso de `FairCoin` p(0,5)
+  $H_0: p = 0.5$
+
+* **Hipótesis alternativa (H₁):** La moneda no es justa, es decir, la probabilidad de obtener cara es distinta de 0,5.
+  $H_1: p \neq 0.5$
+
+### **Supuestos**
+
+* Cada lanzamiento es independiente. (Cada shot no es afectado por el caso anterior o contiguo)
+* Se trata de un experimento binomial (cara vs cruz).
+* El tamaño de la muestra es lo suficientemente grande para usar una aproximación normal (condiciones de normalidad cumplidas para proporciones).
+
+> Apartado especial sobre pasar de distribucion binomial  a normal
+
+
+
+## **Aproximación normal**
+
+Podés aproximar la binomial a una normal **si se cumple**:
+
+$$
+np \geq 10 \quad \text{y} \quad n(1 - p) \geq 10
+$$
+
+Esto permite aplicar la **distribución normal** para calcular probabilidades, intervalos de confianza y realizar tests.
+
+### Ejemplo en R:
+
+```{r muestra-normal}
+n <- 100
+p <- 0.5
+q <- 1 - p
+
+# Condiciones de normalidad
+np <- n * p
+nq <- n * q
+
+cat("np =", np, " | n(1-p) =", nq, "\n")
+
+# Aproximamos con distribución normal
+media <- n * p
+desvio <- sqrt(n * p * (1 - p))
+
+# Probabilidad de obtener entre 45 y 55 caras
+pnorm(55, mean = media, sd = desvio) - pnorm(45, mean = media, sd = desvio)
+```
+
+###  Visualizamos
+
+```{r viz }
+x <- 0:n
+
+probs_binom <- dbinom(x, size = n, prob = p)
+probs_norm <- dnorm(x, mean = media, sd = desvio)
+
+plot(x, probs_binom, type = "h", col = "blue", lwd = 2, main = "Binomial vs Normal", ylab = "Probabilidad")
+lines(x, probs_norm, col = "red", lwd = 2)
+
+legend("topright", legend = c("Binomial", "Normal"), col = c("blue", "red"), lwd = 2)
+```
+
+
+---
+
+### **Código en R**
+
+```{r codigo-probabilidad}
+# Número de caras observadas
+caras <- 530
+
+# Número total de lanzamientos
+n <- 1000
+
+# Test de proporciones (prueba binomial aproximada con z)
+resultado <- prop.test(caras, n, p = 0.5, correct = FALSE)
+
+p_value <- resultado$p.value
+
+# Mostrar resultados
+print(resultado)
+```
+
+---
+**Resultado del análisis**  
+El valor-p obtenido en la prueba de proporciones fue: **`r round(p_value, 4)`**.
