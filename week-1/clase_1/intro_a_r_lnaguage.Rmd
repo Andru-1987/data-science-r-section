@@ -271,6 +271,7 @@ print(matriz_datos)
 ---
 
 # 6. Data Frames: La Estructura Más Importante
+## Sector donde vamos a estar enfocandonos cuando trabajemos para ds
 
 Los data frames pueden contener diferentes tipos de datos en diferentes columnas, similar a una hoja de cálculo.
 
@@ -283,10 +284,7 @@ letras <- c("A", "B", "C", "D", "E")
 df <- data.frame(numeros = numeros, letras = letras)
 
 # O de forma directa
-df <- data.frame(
-  numeros = c(1, 2, 3, 4, 5),
-  letras = c("A", "B", "C", "D", "E")
-)
+df <- data.frame(numeros = c(1, 2, 3, 4, 5), letras = c("A", "B", "C", "D", "E"))
 
 print(df)
 ```
@@ -345,23 +343,30 @@ print(df_expandido)
 
 ```{r eval=FALSE}
 # Guardar en archivo CSV
-write.table(x = df, file = "mi_dataframe.csv", sep = ";")
+csv_name <- sprintf("%s.csv","write_table")
+file_storage_path <- file.path( getwd(), "week-1", "clase_1", "data", csv_name)
+
+write.table(x = df, file = file_storage_path , sep = ",")
 
 # O usando write.csv
-write.csv(df, "mi_dataframe.csv", row.names = FALSE)
+csv_name <- sprintf("%s.csv","write_csv")
+file_storage_path <- file.path( getwd(), "week-1", "clase_1", "data", csv_name)
+write.csv(df, file_storage_path, row.names = FALSE)
 ```
 
 ## 7.2 Leer Archivos
 
 ```{r eval=FALSE}
 # Leer archivo CSV
-datos_importados <- read.csv("mi_dataframe.csv", sep = ";")
+csv_local_path <- file.path(getwd(), "week-1", "clase_1","data", "gcba_suaci_barrios.csv")
+datos_importados <- utils::read.csv( csv_local_path, sep = ",", fileEncoding= "UTF-8")
 
 # Verificar directorio de trabajo
 getwd()
 
 # Cambiar directorio de trabajo
 # setwd("ruta/a/tu/directorio")
+str(datos_importados)
 ```
 
 ---
@@ -388,12 +393,7 @@ length(mi_lista)
 mi_lista <- c(mi_lista, "nuevo_elemento")
 
 # Lista con vectores
-lista_compleja <- list(
-  numeros = c(1, 2, 3),
-  texto = "hola",
-  fecha = Sys.Date(),
-  logico = TRUE
-)
+lista_compleja <- list(numeros = c(1, 2, 3),texto = "hola", fecha = Sys.Date(),logico = TRUE)
 
 # Acceder a elemento específico de un vector dentro de la lista
 lista_compleja$numeros[2]    # Segundo elemento del vector 'numeros'

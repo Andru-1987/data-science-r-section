@@ -1,0 +1,151 @@
+---
+title: "Mini-proyecto en R: ETL, EDA Avanzada y Tests de Hipótesis"
+output: html_notebook
+---
+
+# Objetivos del notebook  
+1. Demostrar cómo realizar un flujo **ETL** rápido sobre un dataset público.  
+2. Realizar un **EDA (Análisis Exploratorio de Datos)** más completo, incorporando `str()` y medidas de agregación.  
+3. Explicar qué es un test de hipótesis y mostrar ejemplos prácticos (usando datos simulados y el dataset *iris*).  
+
+
+```{r setup, include=FALSE}
+# Carga de librerías clave
+suppressPackageStartupMessages({
+  library(tidyverse)   # dplyr, ggplot2, readr, etc.
+  library(DT)          # Tablas interactivas
+  library(plotly)      # Gráficos interactivos
+  library(corrplot)    # Mapa de correlaciones
+})
+
+set.seed(42)  # Para reproducibilidad global
+```
+
+---
+
+# 0. Conceptos rápidos
+
+| Concepto              | Definición                                                                                       | Por qué lo usamos                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| **ETL**               | Extraer, Transformar y Cargar datos                                                              | Para dejar los datos limpios y listos para análisis o modelado         |
+| **EDA**               | Análisis Exploratorio de Datos                                                                   | Paso para explorar distribución, correlaciones, valores atípicos, etc. |
+| **Test de hipótesis** | Procedimiento estadístico para decidir si una hipótesis nula (H₀) es razonable o debe rechazarse | Ayuda a convertir evidencia muestral en conclusiones fiables           |
+
+> Regla general: *Si el p-valor < 0.05, rechazamos H₀. En caso contrario, no hay evidencia suficiente para descartarla.*
+
+---
+
+# 1. ETL exprés con el dataset iris
+
+## 1.1 Extracción (Extract)
+
+```{r etl-extract}
+# Cargar dataset incluido en R
+data(iris)
+iris_raw <- iris
+head(iris_raw)
+```
+
+## 1.2 Transformación (Transform)
+
+```{r etl-transform}
+iris_clean <- iris_raw %>%
+  rename_with(~ str_replace_all(., "[.]", "_")) %>%     # Renombrar puntos a guión bajo
+  rename(Petalo_Largo_cm = Petal_Length) %>%            # Alias descriptivo para longitud del pétalo
+  mutate(Sepalo_Ratio = Sepal_Length / Sepal_Width)     # Nueva variable de interés
+
+head(iris_clean)
+```
+
+### 1.2.1 Ejercicios adicionales
+
+```{r etl-extras}
+c <- iris_clean %>%
+  mutate(Es_Petalo_Grande = Petalo_Largo_cm > 5) %>%    # Variable booleana
+  mutate(Species = factor(Species,                       # Reordenar niveles
+                          levels = c("setosa", "versicolor", "virginica"),
+                          labels = c("Setosa", "Versicolor", "Virginica")))
+glimpse(c)
+```
+
+## 1.3 Carga (Load)
+
+```{r etl-load, include=FALSE}
+write_csv(iris_clean, "iris_clean.csv")
+```
+
+---
+
+# 2. Análisis Exploratorio de Datos (EDA)
+
+## 2.1 Inspección rápida
+
+```{r str-glimpse}
+str(iris_clean)
+glimpse(iris_clean)
+```
+
+## 2.2 Estadísticas básicas
+
+```{r head-summary}
+head(iris_clean, 5)
+count(iris_clean, Species)
+summary(iris_clean)
+```
+
+## 2.3 Medidas agregadas por especie
+
+```{r aggregation}
+agg_tbl <- iris_clean %>% 
+  group_by(Species) %>% 
+  summarise(
+    across(c(Sepal_Length, Sepal_Width, Petalo_Largo_cm, Sepalo_Ratio),
+           list(media = mean, sd = sd, min = min, max = max))
+  )
+agg_tbl
+```
+
+## 2.4 Visualizaciones
+
+```{r plots, warning=FALSE}
+plotly::ggplotly(
+  ggplot(iris_clean, aes(Petalo_Largo_cm, fill = Species)) +
+    geom_histogram(alpha = 0.7, bins = 20, colour = "black") +
+    theme_minimal() +
+    labs(title = "Distribución del largo del pétalo", x = "cm")
+)
+```
+
+---
+
+# 3. Tests de Hipótesis
+
+## 3.1 Test t de una muestra (media de Sepal\_Length en versicolor = 6 cm)
+
+```{r t-one-sample-iris}
+versicolor <- filter(iris_clean, Species == "versicolor")
+t.test(versicolor$Sepal_Length, mu = 6)
+```
+
+Interpretación: p-valor alto indica que no hay evidencia para rechazar la hipótesis nula de media = 6 cm.
+
+## 3.2 Test t de Welch (comparación de largo de pétalos entre virginica y versicolor)
+
+```{r welch-iris}
+virginica <- filter(iris_clean, Species == "virginica")
+t.test(virginica$Petalo_Largo_cm, versicolor$Petalo_Largo_cm,
+       alternative = "greater", var.equal = FALSE)
+```
+
+Interpretación: p-valor muy pequeño indica que virginica tiene pétalos significativamente más largos que versicolor.
+
+## 3.3 Test de proporciones (moneda hipotética)
+
+```{r prop-test}
+caras <- 530
+n <- 1000
+prop.test(caras, n, p = 0.5, correct = FALSE)
+```
+
+Interpretación: no hay evidencia suficiente para afirmar que la moneda esté sesgada.
+
