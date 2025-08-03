@@ -9,14 +9,25 @@ output: html_notebook
 3. Explicar qué es un test de hipótesis y mostrar ejemplos prácticos (usando datos simulados y el dataset *iris*).  
 
 
+
+
+```{r setup, include=FALSE}
+#  instalacion de dependencias, siempre y cuando no los tengan instalados
+dependency <- c("tidyverse","DT","plotly","corrplot")
+needed_to_install <- dependency[ !(dependency %in% installed.packages()[,"Package"])]
+
+# ciclos for
+lapply(needed_to_install, install.packages)
+```
+
+
 ```{r setup, include=FALSE}
 # Carga de librerías clave
-suppressPackageStartupMessages({
-  library(tidyverse)   # dplyr, ggplot2, readr, etc.
-  library(DT)          # Tablas interactivas
-  library(plotly)      # Gráficos interactivos
-  library(corrplot)    # Mapa de correlaciones
-})
+
+library(tidyverse)   # dplyr, ggplot2, readr, etc.
+library(DT)          # Tablas interactivas
+library(plotly)      # Gráficos interactivos
+library(corrplot)    # Mapa de correlaciones
 
 set.seed(42)  # Para reproducibilidad global
 ```
@@ -41,18 +52,47 @@ set.seed(42)  # Para reproducibilidad global
 
 ```{r etl-extract}
 # Cargar dataset incluido en R
+# dataset cargado directamente con el sistema
 data(iris)
 iris_raw <- iris
 head(iris_raw)
 ```
 
 ## 1.2 Transformación (Transform)
+```{R etl-transform}
+# Versión simplificada
+iris_clean <- iris_raw
+# reemplaza puntos  por guiones bajos
+names(iris_clean) <- gsub("\\.", "_", names(iris_clean))
+
+# Renombra una columna
+names(iris_clean)[names(iris_clean) == "Petal_Length"] <- "Petalo_Largo_cm"  
+
+# Nueva columna(un ratio)
+iris_clean$Sepalo_Ratio <- iris_clean$Sepal_Length / iris_clean$Sepal_Width 
+
+head(iris_clean)
+```
 
 ```{r etl-transform}
+# operador del tipo pipe en r es : %>%
+# basicamente seria como un : 
+# paso3(paso2(paso1(datos)))
+# en verison pipe
+# datos %>%
+#   paso1() %>%
+#   paso2() %>%
+#   paso3()
+
+
+
 iris_clean <- iris_raw %>%
-  rename_with(~ str_replace_all(., "[.]", "_")) %>%     # Renombrar puntos a guión bajo
-  rename(Petalo_Largo_cm = Petal_Length) %>%            # Alias descriptivo para longitud del pétalo
-  mutate(Sepalo_Ratio = Sepal_Length / Sepal_Width)     # Nueva variable de interés
+  # Renombrar puntos a guión bajo
+  rename_with(~ str_replace_all(., "[.]", "_")) %>% 
+  # Alias descriptivo para longitud del pétalo
+  rename(Petalo_Largo_cm = Petal_Length) %>%
+  # Nueva variable de interés
+  mutate(Sepalo_Ratio = Sepal_Length / Sepal_Width)
 
 head(iris_clean)
 ```
@@ -60,11 +100,14 @@ head(iris_clean)
 ### 1.2.1 Ejercicios adicionales
 
 ```{r etl-extras}
+
 c <- iris_clean %>%
-  mutate(Es_Petalo_Grande = Petalo_Largo_cm > 5) %>%    # Variable booleana
-  mutate(Species = factor(Species,                       # Reordenar niveles
-                          levels = c("setosa", "versicolor", "virginica"),
-                          labels = c("Setosa", "Versicolor", "Virginica")))
+  # Mutacion en variables booleans
+  mutate(Es_Petalo_Grande = Petalo_Largo_cm > 5) %>%
+  
+  # ordenar los niveles
+  mutate(Species = factor(Species,levels = c("setosa", "versicolor", "virginica"),labels = c("Setosa", "Versicolor", "Virginica")))
+
 glimpse(c)
 ```
 
@@ -73,6 +116,41 @@ glimpse(c)
 ```{r etl-load, include=FALSE}
 write_csv(iris_clean, "iris_clean.csv")
 ```
+
+```{R etl-load-optional}
+library(DBI)
+library(RSQLite)
+library(here)
+
+database_path <- here("week-1","clase_2","database","iris_database.db")
+
+con <- dbConnect(SQLite(), database_path)
+
+dbWriteTable(con, "iris_clean", iris_clean, overwrite=TRUE)
+
+# check si la tabla fue creada y generar una query
+
+dbListTables(con)
+
+dbGetQuery(con, "SELECT * FROM iris_clean LIMIT 10")
+
+dbDisconnect(con)
+```
+
+```{R etl-tidy-verse-load}
+library(dplyr)
+library(DBI)
+library(here)
+
+database_path <- here("week-1","clase_2","database","iris_database_tidyverse.db")
+con <- dbConnect(SQLite(), database_path)
+dbWriteTable(con, "iris_clean", iris_clean, overwrite = TRUE) 
+get_data <- dbGetQuery(con, "SELECT * FROM iris_clean LIMIT 10")
+print(get_data)
+dbDisconnect(con)
+```
+
+
 
 ---
 
@@ -95,25 +173,58 @@ summary(iris_clean)
 
 ## 2.3 Medidas agregadas por especie
 
+```{R agg-tables-data}
+
+grupos_iris <- iris_clean %>% 
+  group_by(Species)
+
+# calculo de la media de cada columna
+
+medias <- grupos_iris %>%  summarise(media_Sepal_Length = mean(Sepal_Length),media_Sepal_Width = mean(Sepal_Width),media_Petalo_Largo = mean(Petalo_Largo_cm),media_Sepalo_Ratio = mean(Sepalo_Ratio))
+
+# calcular Desviación Estándar
+desviaciones <- grupos_iris %>% summarise(sd_Sepal_Length = sd(Sepal_Length),sd_Sepal_Width = sd(Sepal_Width),sd_Petalo_Largo = sd(Petalo_Largo_cm),sd_Sepalo_Ratio = sd(Sepalo_Ratio))
+
+# calcular Mínimos y Máximos
+min_max <- grupos_iris %>% summarise(min_Sepal_Length = min(Sepal_Length),max_Sepal_Length = max(Sepal_Length),min_Sepal_Width = min(Sepal_Width),max_Sepal_Width = max(Sepal_Width),min_Petalo_Largo = min(Petalo_Largo_cm),max_Petalo_Largo = max(Petalo_Largo_cm),min_Sepalo_Ratio = min(Sepalo_Ratio),max_Sepalo_Ratio = max(Sepalo_Ratio))
+
+# combinar resultados
+resultado_final <- medias %>% left_join(desviaciones, by = "Species") %>% left_join(min_max, by = "Species")
+print("Observacion de los resultados final\n")
+print(resultado_final)
+
+
+# version mucho mas sencilla
+```
+
+```{R agg-intermedio-table}
+agg_resultado <- iris_clean %>% group_by(Species) %>% summarise(media_Sepal_Length = mean(Sepal_Length),media_Sepal_Width = mean(Sepal_Width),sd_Sepal_Length = sd(Sepal_Length),sd_Sepal_Width = sd(Sepal_Width),min_Petalo = min(Petalo_Largo_cm),max_Petalo = max(Petalo_Largo_cm))
+
+agg_resultado
+```
+
 ```{r aggregation}
-agg_tbl <- iris_clean %>% 
-  group_by(Species) %>% 
-  summarise(
-    across(c(Sepal_Length, Sepal_Width, Petalo_Largo_cm, Sepalo_Ratio),
-           list(media = mean, sd = sd, min = min, max = max))
-  )
+agg_tbl <- iris_clean %>% group_by(Species) %>% summarise(across(c(Sepal_Length, Sepal_Width, Petalo_Largo_cm, Sepalo_Ratio),list(media = mean, sd = sd, min = min, max = max)))
+
 agg_tbl
 ```
 
 ## 2.4 Visualizaciones
+```{R plots, warning=FALSE}
 
-```{r plots, warning=FALSE}
-plotly::ggplotly(
-  ggplot(iris_clean, aes(Petalo_Largo_cm, fill = Species)) +
-    geom_histogram(alpha = 0.7, bins = 20, colour = "black") +
-    theme_minimal() +
-    labs(title = "Distribución del largo del pétalo", x = "cm")
-)
+library(ggplot2)
+
+plot <- ggplot(iris_clean, aes(x = Petalo_Largo_cm, fill = Species)) + 
+  geom_histogram(alpha = 0.7, bins = 20, color = "black") +
+  theme_minimal() +
+  labs(title = "Distribución del largo del pétalo") +
+  scale_fill_brewer(palette = "Set1")
+
+
+print(plot)
+
+local_storage <- here("week-1","clase_2", "images", "histograma_petalo.png")
+ggsave(local_storage, plot, width = 8, height = 5, dpi = 300)
 ```
 
 ---
@@ -121,6 +232,64 @@ plotly::ggplotly(
 # 3. Tests de Hipótesis
 
 ## 3.1 Test t de una muestra (media de Sepal\_Length en versicolor = 6 cm)
+Un t-test, es una herramienta estadística utilizada para comparar las medias de dos grupos de datos y determinar si la diferencia entre ellos es estadísticamente significativa. En otras palabras, ayuda a decidir si la diferencia observada entre los grupos es real o simplemente resultado del azar.
+### Explicación del Análisis t-test de una muestra
+
+#### **Código ejecutado:**
+```r
+versicolor <- filter(iris_clean, Species == "versicolor")
+t.test(versicolor$Sepal_Length, mu = 6)
+```
+1. **t = -0.87674**:  
+   - Valor del estadístico t, que mide cuánto se desvía la media muestral del valor hipotético (6 cm), en unidades de error estándar.  
+   - El signo negativo indica que la media muestral (5.936) es menor que 6.
+
+2. **df = 49**:  
+   Grados de libertad (n-1 = 50-1 = 49).
+
+3. **p-value = 0.3849**:  
+   - Probabilidad de observar una media igual o más extrema que 5.936 cm, **asumiendo que la verdadera media es 6 cm**.  
+   - **Como p > 0.05, no hay evidencia significativa para rechazar la hipótesis nula**.
+
+4. **Intervalo de confianza al 95%**: [5.789, 6.083] cm:  
+   - Rango donde esperamos que esté la verdadera media poblacional.  
+   - Incluye el valor hipotético (6 cm), lo que respalda la conclusión del p-valor.
+
+5. **Media muestral (mean of x) = 5.936 cm**:  
+   Valor observado en los datos.
+
+---
+
+### **Conclusión:**
+- **Hipótesis nula (H₀)**: "La media de `Sepal_Length` en *versicolor* es 6 cm".  
+- **Hipótesis alternativa (H₁)**: "La media no es 6 cm".  
+
+**Resultado**:  
+No podemos rechazar H₀ (p = 0.3849 > 0.05). Esto significa que:  
+- La diferencia entre la media observada (5.936 cm) y 6 cm **no es estadísticamente significativa**.  
+- La ligera diferencia (6 - 5.936 = 0.064 cm) podría deberse al azar en el muestreo.
+
+---
+
+### Visualización 
+```{R}
+library(ggplot2)
+
+plot <- ggplot(versicolor, aes(x = Sepal_Length)) + 
+  geom_histogram(bins = 15, fill = "lightblue", color = "black") +
+  geom_vline(xintercept = 6, color = "red", linetype = "dashed") +
+  labs(title = "Sepal Length en Iris versicolor vs valor hipotético (6 cm)",
+       x = "Sepal Length (cm)") +
+  theme_minimal()
+
+# Enable inline plotting
+options(repr.plot.width=8, repr.plot.height=5)
+print(plot)
+
+local_storage <- here("week-1","clase_2", "images", "p_value.png")
+ggsave(local_storage, plot, width = 8, height = 5, dpi = 300)
+
+```
 
 ```{r t-one-sample-iris}
 versicolor <- filter(iris_clean, Species == "versicolor")
