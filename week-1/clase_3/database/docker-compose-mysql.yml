@@ -1,0 +1,22 @@
+x-shared-volumes: &shared-scripts
+  - ./scripts/:/scripts/
+
+services:
+  usql:
+    image: usql/usql
+    container_name: usql-cli
+    stdin_open: true
+    tty: true
+    entrypoint: ["sleep", "infinity"]
+    volumes: *shared-scripts
+
+  mysql:
+    image: mysql:latest
+    hostname: mysql
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: pass_admin
+    ports:
+      - 3306:3306
+    volumes: *shared-scripts

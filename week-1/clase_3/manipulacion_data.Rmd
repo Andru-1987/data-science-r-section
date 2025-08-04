@@ -1,0 +1,50 @@
+---
+title: Manipulacion de datos con R
+output:
+    html_output: default
+
+---
+
+```{R obtencion-data-from-url}
+url_path <- "https://gist.githubusercontent.com/rnirmal/e01acfdaf54a6f9b24e91ba4cae63518/raw/6b589a5c5a851711e20c5eb28f9d54742d1fe2dc/datasets.csv"
+data <- read.csv(url_path, sep = ",")
+
+glimpse(data)
+```
+```{R obtencion-data-from-local}
+
+library(dplyr)
+
+"week-1/clase_3/csv/data_sample.csv" %>%
+  strsplit(split = "/", fixed = TRUE) %>%
+  .[[1]] %>%
+  { do.call(here::here, as.list(.)) } %>%
+  read.csv() -> groups
+
+# forma de obtencion con csv local
+head(groups)
+
+```
+
+
+```{R obtencion-data-from-db}
+
+# install dependencies
+install.packages("DBI")
+install.packages("RMySQL")
+
+library(DBI)
+library(RMySQL)
+```
+
+
+```{R obtencion-data-from-db}
+
+query_data <- paste("SELECT","    c.id,","    c.ozone,","    c.solar_r,","    c.wind,","    c.temp,","    c.month,","    c.day,","    w.name","FROM `weather`.`cities` AS w","LEFT JOIN `weather`.`weather_data` AS c ON w.id = c.city_id",sep = "\n")
+
+mysql_cnx <- dbConnect(MySQL(),db_name="weather",host="127.0.0.1",port=3306,user="root",password="pass_admin")
+
+dataframe <- dbGetQuery(mysql_cnx,query_data)
+
+head(dataframe)
+```
