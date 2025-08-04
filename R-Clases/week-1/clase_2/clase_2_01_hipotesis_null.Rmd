@@ -1,14 +1,21 @@
 ---
 title: "Hipótesis Nula (ejemplo base)"
-author: "Anderson Ocana"
+author: "Anderson Ocaña"
 date: "`r Sys.Date()`"
 output: 
-   html_document:
-      toc: true
-      toc_float: true
-      theme: united
-      highlight: tango
-      code_folding: show
+  pdf_document:
+    toc: true
+    number_sections: true
+    highlight: tango
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    highlight: tango
+    code_folding: show
+fontsize: 10pt
+geometry: margin=1in
+      
 ---
 
 ### ¿Qué es la hipótesis nula?
@@ -33,13 +40,13 @@ Ejemplos:
 
 #### **Evita conclusiones erróneas (falsos positivos)**
 
-   * Sin H₀, podrías interpretar cualquier diferencia o patrón como relevante, incluso si es producto del ruido.
-   * Al establecer una hipótesis nula, reduces el riesgo de cometer un **error tipo I** (rechazar H₀ cuando es cierta).
+   * Sin H$_0$, podrías interpretar cualquier diferencia o patrón como relevante, incluso si es producto del ruido.
+   * Al establecer una hipótesis nula, reduces el riesgo de cometer un **error tipo I** (rechazar H$_0$ cuando es cierta).
 
 #### **Permite diseñar experimentos y A/B tests**
 
-   * En marketing, productos o UX, los tests A/B usan H₀ para saber si un cambio tiene impacto real.
-   * Ejemplo: "H₀: la tasa de clics de la versión A es igual a la de la versión B."
+   * En marketing, productos o UX, los tests A/B usan H$_0$ para saber si un cambio tiene impacto real.
+   * Ejemplo: "H$_0$: la tasa de clics de la versión A es igual a la de la versión B."
 
 #### **Da un marco formal y comunicable**
 
@@ -48,7 +55,7 @@ Ejemplos:
 #### **Conecta ciencia y negocio**
 
    * Te ayuda a traducir preguntas de negocio a una forma cuantificable:
-        > "¿Funciona esta campaña?" → H₀: "No tiene efecto sobre las ventas".
+        > "¿Funciona esta campaña?" → H$_0$: "No tiene efecto sobre las ventas".
 
 ---
 
@@ -65,10 +72,10 @@ Un investigador lanza una moneda 1.000 veces y obtiene 530 #Desea saber si esta 
 
 ### **Formulación de hipótesis**
 
-* **Hipótesis nula (H₀):** Detectar si tenemos un caso de `FairCoin` p(0,5)
+* **Hipótesis nula (H$_0$):** Detectar si tenemos un caso de `FairCoin` p(0,5)
   $H_0: p = 0.5$
 
-* **Hipótesis alternativa (H₁):** La moneda no es justa, es decir, la probabilidad de obtener cara es distinta de 0,5.
+* **Hipótesis alternativa (Hx$_1$ ):** La moneda no es justa, es decir, la probabilidad de obtener cara es distinta de 0,5.
   $H_1: p \neq 0.5$
 
 ### **Supuestos**
@@ -93,7 +100,7 @@ Esto permite aplicar la **distribución normal** para calcular probabilidades, i
 
 ### Ejemplo en R:
 
-```{r muestra-normal}
+```{R muestra-normal}
 n <- 100
 p <- 0.5
 q <- 1 - p

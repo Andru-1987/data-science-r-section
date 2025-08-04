@@ -4,7 +4,7 @@ Es como maneja el lenguaje es manejado como una especie de notebook en VSC
 ```yml
 ---
 title: "Presentación de la primera clase de R"
-author: "Andru"
+author: "Anderson Ocaña"
 date: "`r Sys.Date()`"
 output: 
   html_document:

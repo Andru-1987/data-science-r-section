@@ -1,6 +1,6 @@
 ---
-title: "Introducción a R: De lo Básico a lo Avanzado"
-author: "Tu Nombre"
+title: "Introducción a R: De lo Básico al mas allá"
+author: "Anderson Ocaña"
 date: "`r Sys.Date()`"
 output: 
   html_document:
@@ -9,9 +9,17 @@ output:
     theme: united
     highlight: tango
     code_folding: show
+  pdf_document:
+    toc: true
+    number_sections: true
+    highlight: tango
+fontsize: 10pt
+geometry: margin=1in
 ---
 
-```{r setup, include=FALSE}
+```{R setup, include=FALSE}
+# R QUOTA
+
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
@@ -20,12 +28,13 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 R es un lenguaje de programación y entorno estadístico muy poderoso para análisis de datos, visualización y computación estadística. En este curso aprenderemos desde los conceptos básicos hasta técnicas más avanzadas.
 
 ## ¿Por qué usar R?
-- Es gratuito y de código abierto
-- Tiene una gran comunidad de usuarios
-- Excelente para análisis estadístico y visualización
-- Miles de paquetes disponibles
 
----
+-   Es gratuito y de código abierto
+-   Tiene una gran comunidad de usuarios
+-   Excelente para análisis estadístico y visualización
+-   Miles de paquetes disponibles
+
+------------------------------------------------------------------------
 
 # 2. Operaciones Básicas en R
 
@@ -50,10 +59,10 @@ print(suma)
 
 Es importante entender el orden en que R evalúa las operaciones:
 
-1. Paréntesis
-2. Potencias
-3. Multiplicación y División
-4. Suma y Resta
+1.  Paréntesis
+2.  Potencias
+3.  Multiplicación y División
+4.  Suma y Resta
 
 ```{r precedencia}
 # Sin paréntesis: primero multiplicación, luego suma
@@ -66,7 +75,7 @@ Es importante entender el orden en que R evalúa las operaciones:
 2 / 8**2
 ```
 
----
+------------------------------------------------------------------------
 
 # 3. Variables y Tipos de Datos
 
@@ -101,7 +110,7 @@ class(b)
 class(c)
 ```
 
----
+------------------------------------------------------------------------
 
 # 4. Vectores: La Base de R
 
@@ -215,7 +224,7 @@ mi_vector[c(1, 3)] <- 999
 print(mi_vector)
 ```
 
----
+------------------------------------------------------------------------
 
 # 5. Matrices: Datos en Dos Dimensiones
 
@@ -268,9 +277,10 @@ matriz_datos[c(1, 3), c(2, 4)] <- 999
 print(matriz_datos)
 ```
 
----
+------------------------------------------------------------------------
 
 # 6. Data Frames: La Estructura Más Importante
+
 ## Sector donde vamos a estar enfocandonos cuando trabajemos para ds
 
 Los data frames pueden contener diferentes tipos de datos en diferentes columnas, similar a una hoja de cálculo.
@@ -335,7 +345,7 @@ df_expandido$años <- 2000:2004
 print(df_expandido)
 ```
 
----
+------------------------------------------------------------------------
 
 # 7. Importar y Exportar Datos
 
@@ -369,7 +379,7 @@ getwd()
 str(datos_importados)
 ```
 
----
+------------------------------------------------------------------------
 
 # 8. Listas: Contenedores Flexibles
 
@@ -400,7 +410,7 @@ lista_compleja$numeros[2]    # Segundo elemento del vector 'numeros'
 lista_compleja[[1]][2]       # Forma alternativa
 ```
 
----
+------------------------------------------------------------------------
 
 # 9. Conversiones de Tipos de Datos
 
@@ -448,7 +458,7 @@ matriz_mixta <- as.matrix(datos)
 str(matriz_mixta)     # Ahora todo es character
 ```
 
----
+------------------------------------------------------------------------
 
 # 10. Funciones y Paquetes Esenciales
 
@@ -519,7 +529,7 @@ valores <- c(23, 45, 56, 78)
 barplot(valores, names.arg = categorias, main = "Gráfico de Barras")
 ```
 
----
+------------------------------------------------------------------------
 
 # 11. Paquetes Adicionales
 
@@ -553,21 +563,21 @@ library(ggplot2)
 # ggplot() + geom_bar() - gráficos de barras
 ```
 
----
+------------------------------------------------------------------------
 
 # 12. Ejercicios Prácticos
 
 ## Ejercicio 1: Operaciones Básicas
+
 Crea dos vectores de 5 elementos cada uno y realiza todas las operaciones aritméticas básicas entre ellos.
 
 ## Ejercicio 2: Data Frame
+
 Crea un data frame con información de 5 estudiantes (nombre, edad, calificación) y calcula la calificación promedio.
 
 ## Ejercicio 3: Análisis Exploratorio
-Usa el dataset `mtcars` (incluido en R) para:
-- Ver sus dimensiones
-- Calcular estadísticas descriptivas
-- Crear un gráfico de dispersión entre dos variables
+
+Usa el dataset `mtcars` (incluido en R) para: - Ver sus dimensiones - Calcular estadísticas descriptivas - Crear un gráfico de dispersión entre dos variables
 
 ```{r ejercicio-mtcars}
 # Cargar el dataset
@@ -584,18 +594,20 @@ plot(mtcars$wt, mtcars$mpg,
      ylab = "Millas por galón")
 ```
 
----
+------------------------------------------------------------------------
 
 # 13. Recursos Adicionales
 
 ## Documentación y Ayuda
-- `help(funcion)` o `?funcion` - ayuda sobre una función específica
-- `example(funcion)` - ejemplos de uso
-- `help.search("tema")` - buscar ayuda sobre un tema
+
+-   `help(funcion)` o `?funcion` - ayuda sobre una función específica
+-   `example(funcion)` - ejemplos de uso
+-   `help.search("tema")` - buscar ayuda sobre un tema
 
 ## Sitios Web Útiles
-- [R Documentation](https://www.rdocumentation.org/)
-- [CRAN Task Views](https://cran.r-project.org/web/views/)
-- [Stack Overflow - R](https://stackoverflow.com/questions/tagged/r)
 
----
+-   [R Documentation](https://www.rdocumentation.org/)
+-   [CRAN Task Views](https://cran.r-project.org/web/views/)
+-   [Stack Overflow - R](https://stackoverflow.com/questions/tagged/r)
+
+------------------------------------------------------------------------

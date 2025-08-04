@@ -1,6 +1,20 @@
 ---
-title: "Mini-proyecto en R: ETL, EDA Avanzada y Tests de Hipótesis"
-output: html_notebook
+title: "Mini-proyecto en R: ETL & EDA"
+author: "Anderson Ocaña"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    number_sections: true
+    highlight: tango
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    highlight: tango
+    code_folding: show
+fontsize: 10pt
+geometry: margin=1in
 ---
 
 # Objetivos del notebook  
@@ -11,9 +25,9 @@ output: html_notebook
 
 
 
-```{r setup, include=FALSE}
+```{R  instalacion-dependencias}
 #  instalacion de dependencias, siempre y cuando no los tengan instalados
-dependency <- c("tidyverse","DT","plotly","corrplot")
+dependency <- c("tidyverse","DT","plotly","corrplot","RSQLite")
 needed_to_install <- dependency[ !(dependency %in% installed.packages()[,"Package"])]
 
 # ciclos for
@@ -40,9 +54,9 @@ set.seed(42)  # Para reproducibilidad global
 | --------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
 | **ETL**               | Extraer, Transformar y Cargar datos                                                              | Para dejar los datos limpios y listos para análisis o modelado         |
 | **EDA**               | Análisis Exploratorio de Datos                                                                   | Paso para explorar distribución, correlaciones, valores atípicos, etc. |
-| **Test de hipótesis** | Procedimiento estadístico para decidir si una hipótesis nula (H₀) es razonable o debe rechazarse | Ayuda a convertir evidencia muestral en conclusiones fiables           |
+| **Test de hipótesis** | Procedimiento estadístico para decidir si una hipótesis nula (H$_0$) es razonable o debe rechazarse | Ayuda a convertir evidencia muestral en conclusiones fiables           |
 
-> Regla general: *Si el p-valor < 0.05, rechazamos H₀. En caso contrario, no hay evidencia suficiente para descartarla.*
+> Regla general: *Si el p-valor < 0.05, rechazamos H$_0$. En caso contrario, no hay evidencia suficiente para descartarla.*
 
 ---
 
@@ -74,7 +88,7 @@ iris_clean$Sepalo_Ratio <- iris_clean$Sepal_Length / iris_clean$Sepal_Width
 head(iris_clean)
 ```
 
-```{r etl-transform}
+```{R etl-transform-pipes}
 # operador del tipo pipe en r es : %>%
 # basicamente seria como un : 
 # paso3(paso2(paso1(datos)))
@@ -122,7 +136,7 @@ library(DBI)
 library(RSQLite)
 library(here)
 
-database_path <- here("week-1","clase_2","database","iris_database.db")
+database_path <- here("R-Clases","week-1","clase_2","database","iris_database.db")
 
 con <- dbConnect(SQLite(), database_path)
 
@@ -142,7 +156,7 @@ library(dplyr)
 library(DBI)
 library(here)
 
-database_path <- here("week-1","clase_2","database","iris_database_tidyverse.db")
+database_path <- here("R-Clases","week-1","clase_2","database","iris_database_tidyverse.db")
 con <- dbConnect(SQLite(), database_path)
 dbWriteTable(con, "iris_clean", iris_clean, overwrite = TRUE) 
 get_data <- dbGetQuery(con, "SELECT * FROM iris_clean LIMIT 10")
@@ -223,7 +237,7 @@ plot <- ggplot(iris_clean, aes(x = Petalo_Largo_cm, fill = Species)) +
 
 print(plot)
 
-local_storage <- here("week-1","clase_2", "images", "histograma_petalo.png")
+local_storage <- here("R-Clases","week-1","clase_2", "images", "histograma_petalo.png")
 ggsave(local_storage, plot, width = 8, height = 5, dpi = 300)
 ```
 
@@ -257,11 +271,11 @@ Un t-test, es una herramienta estadística utilizada para comparar las medias de
 ---
 
 ### **Conclusión:**
-- **Hipótesis nula (H₀)**: "La media de `Sepal_Length` en *versicolor* es 6 cm".  
-- **Hipótesis alternativa (H₁)**: "La media no es 6 cm".  
+- **Hipótesis nula (H$_0$)**: "La media de `Sepal_Length` en *versicolor* es 6 cm".  
+- **Hipótesis alternativa (Hx$_1$ )**: "La media no es 6 cm".  
 
 **Resultado**:  
-No podemos rechazar H₀ (p = 0.3849 > 0.05). Esto significa que:  
+No podemos rechazar H$_0$ (p = 0.3849 > 0.05). Esto significa que:  
 - La diferencia entre la media observada (5.936 cm) y 6 cm **no es estadísticamente significativa**.  
 - La ligera diferencia (6 - 5.936 = 0.064 cm) podría deberse al azar en el muestreo.
 
@@ -271,6 +285,8 @@ No podemos rechazar H₀ (p = 0.3849 > 0.05). Esto significa que:
 ```{R}
 library(ggplot2)
 
+versicolor <- iris_clean %>% filter(Species=="versicolor")
+  
 plot <- ggplot(versicolor, aes(x = Sepal_Length)) + 
   geom_histogram(bins = 15, fill = "lightblue", color = "black") +
   geom_vline(xintercept = 6, color = "red", linetype = "dashed") +
@@ -282,7 +298,7 @@ plot <- ggplot(versicolor, aes(x = Sepal_Length)) +
 options(repr.plot.width=8, repr.plot.height=5)
 print(plot)
 
-local_storage <- here("week-1","clase_2", "images", "p_value.png")
+local_storage <- here("R-Clases","week-1","clase_2", "images", "p_value.png")
 ggsave(local_storage, plot, width = 8, height = 5, dpi = 300)
 
 ```
