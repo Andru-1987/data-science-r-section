@@ -1,0 +1,13 @@
+{
+  "name": "R Environment",
+  "build": {
+    "context": "..",
+    "dockerfile": "Dockerfile"
+  },
+  "extensions": [
+    "Ikuyadeu.r"
+  ],
+  "forwardPorts": [8000],
+  "postCreateCommand": "Rscript -e \"install.packages(c('readr', 'dplyr', 'DBI', 'RSQLite', 'plumber'), repos='https://cloud.r-project.org')\"",
+  "workspaceFolder": "/workspaces/R-Clases"
+}
