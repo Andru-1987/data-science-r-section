@@ -5,9 +5,9 @@
     "dockerfile": "Dockerfile"
   },
   "extensions": [
-    "Ikuyadeu.r"
+    "REditorSupport.r"  // <-- mejor soporte que "Ikuyadeu.r"
   ],
-  "forwardPorts": [8000],
-  "postCreateCommand": "Rscript -e \"install.packages(c('readr', 'dplyr', 'DBI', 'RSQLite', 'plumber'), repos='https://cloud.r-project.org')\"",
+  "forwardPorts": [8000, 3306],
+  "postCreateCommand": "Rscript -e \"install.packages(c('readr', 'dplyr', 'DBI', 'RMySQL', 'RSQLite', 'plumber', 'languageserver', 'rmarkdown', 'knitr', 'here', 'tidyverse'), repos='https://cloud.r-project.org')\"",
   "workspaceFolder": "/workspaces/R-Clases"
 }
