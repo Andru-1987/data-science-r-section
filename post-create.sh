@@ -2,12 +2,15 @@
 
 # Post-creation script for R dev container
 set -e
+echo "*****************************************************************************"
+echo "Setting up R development environment..."
 
-echo "🚀 Setting up R development environment..."
+# Create symlink so VS Code can find radian where it expects
+mkdir -p /usr/local/bin
+ln -sf /root/.local/bin/radian /usr/local/bin/radian
 
-# Install R packages (simplified version for your current setup)
+# Install R packages
 Rscript -e "
-# Install your current package list
 install.packages(c(
   'readr', 
   'dplyr', 
@@ -23,15 +26,6 @@ install.packages(c(
 ), repos='https://cloud.r-project.org')
 "
 
-# Set up Git (if not already configured)
-if [ -z "$(git config --global user.name)" ]; then
-    echo "⚠️  Git user not configured. Set up with:"
-    echo "git config --global user.name 'Your Name'"
-    echo "git config --global user.email 'your.email@example.com'"
-fi
-
-# Create common directories in R-Clases if they don't exist
-mkdir -p R-Clases/{data,output,scripts,reports}
 
 # Set up .Rprofile for project
 cat > .Rprofile << 'EOF'
@@ -50,13 +44,13 @@ if (interactive()) {
     if(requireNamespace("here", quietly = TRUE)) require(here)
     if(requireNamespace("dplyr", quietly = TRUE)) require(dplyr)
   })
-  
-  cat("📊 R Environment Ready!\n")
-  cat("📁 Working directory:", getwd(), "\n")
-  cat("📂 R-Clases folder available\n")
+
+  cat("R Environment Ready!\n")
+  cat("Working directory:", getwd(), "\n")
+  cat("R-Clases folder available\n")
 }
 EOF
 
-echo "✅ Setup complete! Your R development environment is ready."
-echo "🔧 Run 'radian' for an enhanced R console experience."
-echo "📁 Your R files should be in the R-Clases/ folder"
+echo "Setup complete. Your R development environment is ready."
+echo "You can run 'radian' for an enhanced R console."
+echo "Your R files should go inside the R-Clases/ folder."

@@ -28,6 +28,6 @@
       "label": "MySQL"
     }
   },
-  "postCreateCommand": "/bin/bash /workspaces/post-create.sh",
+  "postCreateCommand": "bash /workspaces/post-create.sh",
   "remoteUser": "root"
 }
