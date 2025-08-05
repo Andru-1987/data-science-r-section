@@ -39,5 +39,9 @@ RUN Rscript -e "install.packages('tinytex', repos='https://cloud.r-project.org')
 # Agregar pipx y radian al PATH
 ENV PATH="/root/.local/bin:$PATH"
 
+
+COPY post-create.sh /workspaces/post-create.sh
+RUN chmod +x /workspaces/post-create.sh
+
 # Establecer carpeta de trabajo
 WORKDIR /workspaces/R-Clases
