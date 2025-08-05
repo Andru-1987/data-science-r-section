@@ -1,0 +1,156 @@
+---
+title: Manipulacion de datos con R
+output:
+    html_document:
+      toc: true
+      theme: united
+---
+## Intalacion de paquetes si es necesario
+```{R packages-installation}
+if(!require("tidyverse")) install.packages("tidyverse")
+```
+**Carga de libreras**
+```{R load-packs}
+library(tidyverse)
+```
+**Obtencion de datos por medio de una fuente URL**
+```{R obtencion-data-from-url}
+url_path <- "https://gist.githubusercontent.com/rnirmal/e01acfdaf54a6f9b24e91ba4cae63518/raw/6b589a5c5a851711e20c5eb28f9d54742d1fe2dc/datasets.csv"
+data <- read.csv(url_path, sep = ",")
+
+glimpse(data)
+```
+
+**Obtencion de datos por medio de un archivo local**
+```{R obtencion-data-from-local}
+
+library(dplyr)
+library(here)
+
+string_path <- "./R-Clases/week-1/clase_3/csv/data_sample.csv"
+
+csv_path  <- string_path %>%
+  strsplit(split = "/", fixed = TRUE) %>%
+  .[[1]] %>%
+  { do.call(here::here, as.list(.)) }
+
+if(file.exists(csv_path)){
+  groups <- read.csv(csv_path)
+  head(groups)
+} else {
+  warning("No existe el archivo")
+}
+```
+
+**Obtencion de datos por medio de una base de datos**
+```{R obtencion-data-from-db}
+
+# install dependencies
+install.packages("DBI")
+install.packages("RMySQL")
+
+# library(DBI)
+library(RMySQL)
+```
+
+**Obtencion de datos por medio de una consulta**
+```{R obtencion-data-from-db-query}
+
+# Construcción de la consulta SQL
+query_data <- paste(
+  "SELECT",
+  "    c.id,",
+  "    c.ozone,",
+  "    c.solar_r,",
+  "    c.wind,",
+  "    c.temp,",
+  "    c.month,",
+  "    c.day,",
+  "    w.name",
+  "FROM `weather`.`cities` AS w",
+  "LEFT JOIN `weather`.`weather_data` AS c ON w.id = c.city_id",
+  sep = "\n"
+)
+
+# Conexión a la base de datos MySQL
+tryCatch({
+
+  mysql_cnx <- dbConnect(
+    MySQL(),
+    dbname   = "weather",
+    host     = "127.0.0.1",
+    port     = 3306,
+    user     = "root",
+    password = "pass_admin"
+  )
+
+  # Ejecutar consulta y obtener resultados como dataframe
+  dataframe <- dbGetQuery(mysql_cnx, query_data)
+
+  dbDisconnect(mysql_cnx)
+
+  # Ver las primeras filas del dataframe
+  head(dataframe)
+}, error = function(e) {
+  message("No es posible conectarse a la base de datos")
+  message(e$message)
+})
+
+```
+
+---
+
+## Limpieza de datos
+**Un poco de data sobre el dataset a usar**
+```{R air-qa-dataset}
+data(airquality)
+summary(airquality)
+head(airquality)
+names(airquality)
+```
+
+- **Formas de selecion de la data dentro del dataset**
+```{R vectores-logicos}
+print("Realizando seleccionado por codigo vectorial")
+
+seleccion <- airquality$Month == 5
+
+mayo <- airquality[seleccion,]
+junio <- airquality[airquality$Month == 6,]
+
+mayo
+junio
+```
+
+# Función subset()
+
+> subset(x=, subset=, select=)
+
+Los parámetros de esta función son:
+
+-   `x` indica el nombre del data frame al que queremos aplicar el filtro
+-   `subset` es una expresión lógica que indica las filas que queremos conservar
+-   `select` es un vector indicando los nombres de las columnas que queremos conservar
+
+```{R subset-values}
+julio <- subset(x=airquality,
+                select = -c(Month,Day, Temp),#seleccionamos un grupo de columnas
+                subset= Month==7) #seleccionamos las filas donde el mes es julio
+julio
+```
+
+
+# Selecciones aleatorias
+
+> sample(x=, size=, replace=)
+
+-   `x` vector de donde obtener las muestras
+-   `size` tamaño de la muestra seleccionada
+-   `replace` es un vector lógico que indica si la muestra es con reposición. Si es *FALSE* los elementos pueden ser seleccionados una sola vez. Si es *TRUE* los elementos pueden ser seleccionados repetidas veces.
+
+```{R aleatorio-sampling}
+
+names(airquality)
+sample(x= airquality %>% filter("Solar.R" > 100), size = 5, replace = TRUE) 
+```
+

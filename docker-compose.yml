@@ -10,7 +10,7 @@ services:
       - ./R-Clases:/workspaces/R-Clases
     ports:
       - "8000:8000"
-      - "3306:3306"
+      # - "3306:3306"
     environment:
       - DEBIAN_FRONTEND=noninteractive
     working_dir: /workspaces

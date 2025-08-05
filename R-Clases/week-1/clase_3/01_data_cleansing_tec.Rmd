@@ -1,0 +1,150 @@
+# Data Cleansing Techniques in R
+
+## 1. Limpieza de datos (Data Cleaning)
+
+### Handling missing values
+```{R}
+# Check for missing values
+sum(is.na(df))
+colSums(is.na(df))
+
+# Remove rows with any NA values
+df_clean <- na.omit(df)
+
+# Replace NA with mean/mode
+df$column[is.na(df$column)] <- mean(df$column, na.rm = TRUE)
+```
+
+### Removing duplicates
+```{R}
+df_unique <- unique(df)
+# Or
+df_nodups <- df[!duplicated(df), ]
+```
+
+### Outlier detection and treatment
+```{R}
+# Identify outliers with boxplot stats
+outliers <- boxplot.stats(df$numeric_column)$out
+df_clean <- df[!df$numeric_column %in% outliers, ]
+
+# Winsorizing outliers
+library(DescTools)
+df$column <- Winsorize(df$column, probs = c(0.05, 0.95))
+```
+
+## 2. Formateado de texto (Text Formatting)
+
+### Case conversion
+```{R}
+df$text_column <- tolower(df$text_column)
+df$text_column <- toupper(df$text_column)
+df$text_column <- tools::toTitleCase(df$text_column)
+```
+
+### Removing special characters
+```{R}
+df$text_column <- gsub("[^[:alnum:][:space:]]", "", df$text_column)
+```
+
+### Standardizing formats
+```{R}
+# Dates
+df$date_column <- as.Date(df$date_column, format = "%m/%d/%Y")
+
+# Numbers
+df$numeric_column <- format(round(df$numeric_column, 2), nsmall = 2)
+```
+
+## 3. Mapeado de datos categóricos (Categorical Data Mapping)
+
+```{R}
+# Create a mapping
+category_map <- c("low" = 1, "medium" = 2, "high" = 3)
+
+# Apply mapping
+df$mapped_column <- category_map[df$category_column]
+```
+
+## 4. Label Encoding
+
+```{R}
+# Using factor conversion
+df$encoded_column <- as.numeric(factor(df$category_column))
+
+# Using match with unique values
+df$encoded_column <- match(df$category_column, unique(df$category_column))
+```
+
+## 5. Dummy Encoding (One-Hot Encoding)
+
+```{R}
+# Using model.matrix
+dummy_vars <- model.matrix(~category_column - 1, data = df)
+df <- cbind(df, dummy_vars)
+
+# Using dummies package
+library(dummies)
+df <- dummy.data.frame(df, names = c("category_column"), sep = "_")
+
+# Using tidyverse
+library(tidyverse)
+df <- df %>% mutate(value = 1) %>% 
+  pivot_wider(names_from = category_column, values_from = value, values_fill = 0)
+```
+
+## 6. String Operations
+
+### Trimming whitespace
+```{R}
+df$text_column <- trimws(df$text_column)
+```
+
+### Splitting strings
+```{R}
+# Split into multiple columns
+df <- separate(df, text_column, into = c("part1", "part2"), sep = ",")
+
+# Split into list
+split_strings <- strsplit(df$text_column, ",")
+```
+
+### String replacement
+```{R}
+df$text_column <- gsub("old_text", "new_text", df$text_column)
+```
+
+### Extracting patterns
+```{R}
+library(stringr)
+df$extracted <- str_extract(df$text_column, "[0-9]+") # extract numbers
+```
+
+### String length
+```{R}
+df$length <- nchar(df$text_column)
+```
+
+### Concatenation
+```{R}
+df$combined <- paste(df$col1, df$col2, sep = "-")
+```
+
+## Additional Useful Techniques
+
+### Consistent factor levels
+```{R}
+df$factor_column <- factor(df$factor_column, levels = c("level1", "level2", "level3"))
+```
+
+### Converting data types
+```{R}
+df$numeric_column <- as.numeric(df$character_column)
+df$character_column <- as.character(df$numeric_column)
+```
+
+### Standardizing text (e.g., phone numbers)
+```{R}
+library(stringr)
+df$phone <- str_replace_all(df$phone, "[^0-9]", "")
+```
