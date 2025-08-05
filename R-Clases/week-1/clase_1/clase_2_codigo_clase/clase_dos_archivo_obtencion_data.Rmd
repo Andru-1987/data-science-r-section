@@ -1,0 +1,87 @@
+---
+title: "Clase 2 Obtencion de datos desce un URL en GITHUB"
+author: "Anderson Ocaña -> Instituto DS" 
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    number_sections: true
+    highlight: tango
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+    highlight: tango
+    code_folding: show
+fontsize: 10pt
+geometry: margin=1in
+---
+
+# Clase de R MarkDown
+
+```{R lectura-archivo-github}
+url_path <- "https://raw.githubusercontent.com/Andru-1987/csv_files_ds/refs/heads/main/market_data.csv"
+
+
+df <- utils::read.csv(url_path, sep=",")
+
+print("El dataframe cargado es:")
+
+head(df)
+```
+
+**Agregar una columna con la fecha de hoy**
+
+```{R add-new_column}
+library(utils)
+
+fecha_particion <- "2025-10-12"
+fecha_particion_date <- as.Date(fecha_particion)
+
+class(fecha_particion_date)
+
+df$particion <- fecha_particion_date
+
+head(df)
+```
+
+**Data Imputation MISSING VALUES**
+
+```{R missing-values}
+
+media__value <- median(df$Item_Weight, na.rm = TRUE)
+media__value
+df$Item_Weight[is.na(df$Item_Weight)] <- media__value
+df
+```
+
+**Graficos Basicos** *Generar un chart de barras sobre la columna de Fat_Content*
+
+```{R graph}
+
+# install.packages("dplyr")
+# install.packages("ggplot2")
+
+library(dplyr)
+library(ggplot2)
+# 
+# data_grouped <- df %>% count(Item_Fat_Content)
+# data_grouped
+# 
+ggplot(df,
+    aes(x=Item_Fat_Content)) +
+    geom_bar(fill = "steelblue") +
+    labs( title = "Frecuencia de Categorias de Fat",
+          x = "Fat Content",
+          y = "Q"
+          )+
+    theme_minimal() -> plot
+
+print(plot)
+
+# barplot(
+#     table(df$Item_Fat_Content)
+# )
+
+
+```
