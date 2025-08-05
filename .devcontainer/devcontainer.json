@@ -3,12 +3,16 @@
   "dockerComposeFile": "docker-compose.yml",
   "service": "r-dev",
   "workspaceFolder": "/workspaces/R-Clases",
+  "overrideCommand": false,
   "extensions": [
     "REditorSupport.r"
   ],
   "forwardPorts": [
     8000,
     3306
+  ],
+  "mounts": [
+    "source=${localWorkspaceFolder}/R-Clases,target=/workspaces/R-Clases,type=bind"
   ],
   "postCreateCommand": "Rscript -e \"install.packages(c('readr', 'dplyr', 'DBI', 'RMySQL', 'RSQLite', 'plumber', 'languageserver', 'rmarkdown', 'knitr', 'here', 'tidyverse'), repos='https://cloud.r-project.org')\""
 }
