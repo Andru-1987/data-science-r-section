@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  r-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../R-Clases:/workspaces/R-Clases
+    ports:
+      - "8000:8000"
+      - "3306:3306"

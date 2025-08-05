@@ -1,19 +1,14 @@
 {
   "name": "R Environment",
-  "build": {
-    "context": "..",
-    "dockerfile": "Dockerfile"
-  },
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "r-dev",
+  "workspaceFolder": "/workspaces/R-Clases",
   "extensions": [
-    "REditorSupport.r" // <-- mejor soporte que "Ikuyadeu.r"
-  ],
-  "mounts": [
-    "source=${localWorkspaceFolder}/R-Clases,target=/workspaces/R-Clases,type=bind"
+    "REditorSupport.r"
   ],
   "forwardPorts": [
     8000,
     3306
   ],
-  "postCreateCommand": "Rscript -e \"install.packages(c('readr', 'dplyr', 'DBI', 'RMySQL', 'RSQLite', 'plumber', 'languageserver', 'rmarkdown', 'knitr', 'here', 'tidyverse'), repos='https://cloud.r-project.org')\"",
-  "workspaceFolder": "/workspaces/R-Clases"
+  "postCreateCommand": "Rscript -e \"install.packages(c('readr', 'dplyr', 'DBI', 'RMySQL', 'RSQLite', 'plumber', 'languageserver', 'rmarkdown', 'knitr', 'here', 'tidyverse'), repos='https://cloud.r-project.org')\""
 }
