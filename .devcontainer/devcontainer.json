@@ -1,18 +1,33 @@
 {
   "name": "R Environment",
-  "dockerComposeFile": "docker-compose.yml",
+  "dockerComposeFile": "../docker-compose.yml",
   "service": "r-dev",
-  "workspaceFolder": "/workspaces/R-Clases",
-  "overrideCommand": false,
-  "extensions": [
-    "REditorSupport.r"
-  ],
+  "workspaceFolder": "/workspaces",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "REditorSupport.r",
+        "RDebugger.r-debugger"
+      ],
+      "settings": {
+        "r.rterm.linux": "/usr/local/bin/radian",
+        "r.bracketedPaste": true,
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
   "forwardPorts": [
     8000,
     3306
   ],
-  "mounts": [
-    "source=${localWorkspaceFolder}/R-Clases,target=/workspaces/R-Clases,type=bind"
-  ],
-  "postCreateCommand": "Rscript -e \"install.packages(c('readr', 'dplyr', 'DBI', 'RMySQL', 'RSQLite', 'plumber', 'languageserver', 'rmarkdown', 'knitr', 'here', 'tidyverse'), repos='https://cloud.r-project.org')\""
+  "portsAttributes": {
+    "8000": {
+      "label": "R Plumber API"
+    },
+    "3306": {
+      "label": "MySQL"
+    }
+  },
+  "postCreateCommand": "bash post-create.sh",
+  "remoteUser": "root"
 }

@@ -3,21 +3,23 @@ title: Manipulacion de datos con R
 output:
     html_output: default
 ---
-
+## Intalacion de paquetes si es necesario
 ```{R packages-installation}
 if(!require("tidyverse")) install.packages("tidyverse")
 ```
-
+**Carga de libreras**
 ```{R load-packs}
 library(tidyverse)
 ```
-
+**Obtencion de datos por medio de una fuente URL**
 ```{R obtencion-data-from-url}
 url_path <- "https://gist.githubusercontent.com/rnirmal/e01acfdaf54a6f9b24e91ba4cae63518/raw/6b589a5c5a851711e20c5eb28f9d54742d1fe2dc/datasets.csv"
 data <- read.csv(url_path, sep = ",")
 
 glimpse(data)
 ```
+
+**Obtencion de datos por medio de un archivo local**
 ```{R obtencion-data-from-local}
 
 library(dplyr)
@@ -33,7 +35,7 @@ head(groups)
 
 ```
 
-
+**Obtencion de datos por medio de una base de datos**
 ```{R obtencion-data-from-db}
 
 # install dependencies
@@ -44,7 +46,7 @@ install.packages("RMySQL")
 library(RMySQL)
 ```
 
-
+**Obtencion de datos por medio de una consulta**
 ```{R obtencion-data-from-db}
 
 # Construcción de la consulta SQL
@@ -83,3 +85,16 @@ head(dataframe)
 
 ---
 
+## Limpieza de datos
+**Un poco de data sobre el dataset a usar**
+```{R air-qa-dataset}
+data(airquality)
+summary(airquality)
+head(airquality)
+names(airquality)
+```
+
+- **Formas de selecion de la data dentro del dataset**
+```{R vectores-logicos}
+
+```

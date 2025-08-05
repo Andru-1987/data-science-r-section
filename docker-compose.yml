@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  r-dev:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    command: tail -f /dev/null
+    volumes:
+      # Monta la carpeta raíz del workspace, no una subcarpeta
+      - ./R-Clases:/workspaces/R-Clases
+    ports:
+      - "8000:8000"
+      - "3306:3306"
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    working_dir: /workspaces
