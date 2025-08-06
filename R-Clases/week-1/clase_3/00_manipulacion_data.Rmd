@@ -1,13 +1,25 @@
 ---
 title: Manipulacion de datos con R
-output:
-    html_document:
-      toc: true
-      theme: united
+author: "Anderson Ocaña"
+date: "`r Sys.Date()`"
+output: 
+  # html_document:
+  #   toc: true
+  #   toc_float: true
+  #   theme: united
+  #   highlight: tango
+  #   code_folding: show
+  pdf_document:
+    toc: true
+    number_sections: true
+    highlight: tango
+fontsize: 10pt
+geometry: margin=1in
+
 ---
 ## Intalacion de paquetes si es necesario
 ```{R packages-installation}
-if(!require("tidyverse")) install.packages("tidyverse")
+if (!require("tidyverse")) install.packages("tidyverse")
 ```
 **Carga de libreras**
 ```{R load-packs}
@@ -23,18 +35,19 @@ glimpse(data)
 
 **Obtencion de datos por medio de un archivo local**
 ```{R obtencion-data-from-local}
-
 library(dplyr)
 library(here)
 
 string_path <- "./R-Clases/week-1/clase_3/csv/data_sample.csv"
 
-csv_path  <- string_path %>%
+csv_path <- string_path %>%
   strsplit(split = "/", fixed = TRUE) %>%
   .[[1]] %>%
-  { do.call(here::here, as.list(.)) }
+  {
+    do.call(here::here, as.list(.))
+  }
 
-if(file.exists(csv_path)){
+if (file.exists(csv_path)) {
   groups <- read.csv(csv_path)
   head(groups)
 } else {
@@ -44,7 +57,6 @@ if(file.exists(csv_path)){
 
 **Obtencion de datos por medio de una base de datos**
 ```{R obtencion-data-from-db}
-
 # install dependencies
 install.packages("DBI")
 install.packages("RMySQL")
@@ -55,7 +67,6 @@ library(RMySQL)
 
 **Obtencion de datos por medio de una consulta**
 ```{R obtencion-data-from-db-query}
-
 # Construcción de la consulta SQL
 query_data <- paste(
   "SELECT",
@@ -73,29 +84,30 @@ query_data <- paste(
 )
 
 # Conexión a la base de datos MySQL
-tryCatch({
+tryCatch(
+  {
+    mysql_cnx <- dbConnect(
+      MySQL(),
+      dbname   = "weather",
+      host     = "127.0.0.1",
+      port     = 3306,
+      user     = "root",
+      password = "pass_admin"
+    )
 
-  mysql_cnx <- dbConnect(
-    MySQL(),
-    dbname   = "weather",
-    host     = "127.0.0.1",
-    port     = 3306,
-    user     = "root",
-    password = "pass_admin"
-  )
+    # Ejecutar consulta y obtener resultados como dataframe
+    dataframe <- dbGetQuery(mysql_cnx, query_data)
 
-  # Ejecutar consulta y obtener resultados como dataframe
-  dataframe <- dbGetQuery(mysql_cnx, query_data)
+    dbDisconnect(mysql_cnx)
 
-  dbDisconnect(mysql_cnx)
-
-  # Ver las primeras filas del dataframe
-  head(dataframe)
-}, error = function(e) {
-  message("No es posible conectarse a la base de datos")
-  message(e$message)
-})
-
+    # Ver las primeras filas del dataframe
+    head(dataframe)
+  },
+  error = function(e) {
+    message("No es posible conectarse a la base de datos")
+    message(e$message)
+  }
+)
 ```
 
 ---
@@ -115,8 +127,8 @@ print("Realizando seleccionado por codigo vectorial")
 
 seleccion <- airquality$Month == 5
 
-mayo <- airquality[seleccion,]
-junio <- airquality[airquality$Month == 6,]
+mayo <- airquality[seleccion, ]
+junio <- airquality[airquality$Month == 6, ]
 
 mayo
 junio
@@ -133,9 +145,11 @@ Los parámetros de esta función son:
 -   `select` es un vector indicando los nombres de las columnas que queremos conservar
 
 ```{R subset-values}
-julio <- subset(x=airquality,
-                select = -c(Month,Day, Temp),#seleccionamos un grupo de columnas
-                subset= Month==7) #seleccionamos las filas donde el mes es julio
+julio <- subset(
+  x = airquality,
+  select = -c(Month, Day, Temp), # seleccionamos un grupo de columnas
+  subset = Month == 7
+) # seleccionamos las filas donde el mes es julio
 julio
 ```
 
@@ -149,8 +163,640 @@ julio
 -   `replace` es un vector lógico que indica si la muestra es con reposición. Si es *FALSE* los elementos pueden ser seleccionados una sola vez. Si es *TRUE* los elementos pueden ser seleccionados repetidas veces.
 
 ```{R aleatorio-sampling}
-
 names(airquality)
-sample(x= airquality %>% filter("Solar.R" > 100), size = 5, replace = TRUE) 
+sample(x = airquality %>% filter("Solar.R" > 100), size = 5, replace = TRUE)
 ```
 
+---
+
+# Manipulación y Limpieza de Datos en R
+
+## Introducción
+
+La limpieza de datos es un paso fundamental en el análisis de datos que puede representar hasta el 80% del tiempo total de un proyecto. Un dataset limpio es la base para obtener resultados confiables y análisis precisos.
+
+```{R generacion-dataset}
+source(here::here("./R-Clases/week-1/clase_3/utilidades/creacion_dataset.R"))
+
+df <- generar_dataset_ejemplo(n = 150, show_summary = TRUE)
+
+library(dplyr)
+glimpse(df)
+```
+
+## 1. Inspección Inicial de Datos
+
+### 1.1 Exploración Básica
+
+Antes de limpiar los datos, es esencial entender su estructura y contenido.
+
+```{R exploracion-basica}
+# Inspección básica
+str(df)           # Estructura del dataframe
+head(df)          # Primeras 6 filas
+tail(df)          # Últimas 6 filas
+summary(df)       # Resumen estadístico
+dim(df)           # Dimensiones (filas, columnas)
+names(df)         # Nombres de las columnas
+```
+
+### 1.2 Identificación de Problemas
+
+```{R identificacion-problemas}
+# Verificar valores únicos
+sapply(df, function(x) length(unique(x)))
+
+# Identificar tipos de datos incorrectos
+sapply(df, class)
+
+# Detectar patrones anómalos en variables categóricas
+table(df$departamento, useNA = "ifany")
+table(df$genero, useNA = "ifany")
+table(df$estado_civil, useNA = "ifany")
+```
+
+## 2. Manejo de Valores Faltantes (NA)
+
+### 2.1 Detección de Valores Faltantes
+
+```{R deteccion-na}
+# Contar NA por columna
+colSums(is.na(df))
+
+# Porcentaje de NA por columna
+colMeans(is.na(df)) * 100
+
+# Visualizar patrones de NA
+sum(is.na(df))                    # Total de NA
+sum(complete.cases(df))           # Filas completas
+nrow(df) - sum(complete.cases(df)) # Filas con al menos un NA
+```
+
+### 2.2 Estrategias para Manejar NA
+
+#### Eliminación de NA
+```{R eliminacion-na}
+# Eliminar filas con cualquier NA
+df_clean <- na.omit(df)
+cat("Filas antes:", nrow(df), "- Filas después:", nrow(df_clean), "\n")
+
+# Eliminar filas con NA en columnas específicas importantes
+df_filtrado <- df[complete.cases(df[, c("id", "edad")]), ]
+cat("Filas después de filtrar por ID y edad:", nrow(df_filtrado), "\n")
+```
+
+#### Reemplazo de NA
+```{R reemplazo-na}
+# Crear copia para trabajar
+df_working <- df
+
+# Reemplazar con media (variables numéricas)
+df_working$edad[is.na(df_working$edad)] <- mean(df_working$edad, na.rm = TRUE)
+df_working$experiencia[is.na(df_working$experiencia)] <- mean(df_working$experiencia, na.rm = TRUE)
+df_working$puntaje[is.na(df_working$puntaje)] <- mean(df_working$puntaje, na.rm = TRUE)
+
+# Reemplazar con moda (variables categóricas)
+# Función para calcular moda
+calcular_moda <- function(x) {
+  x <- x[!is.na(x) & x != ""]
+  if(length(x) == 0) return(NA)
+  tabla <- table(x)
+  names(tabla)[which.max(tabla)]
+}
+
+moda_departamento <- calcular_moda(df_working$departamento)
+df_working$departamento[is.na(df_working$departamento)] <- moda_departamento
+
+moda_genero <- calcular_moda(df_working$genero)
+df_working$genero[is.na(df_working$genero)] <- moda_genero
+
+moda_estado_civil <- calcular_moda(df_working$estado_civil)
+df_working$estado_civil[is.na(df_working$estado_civil)] <- moda_estado_civil
+
+# Verificar resultado
+colSums(is.na(df_working))
+```
+
+## 3. Detección y Manejo de Valores Atípicos
+
+### 3.1 Identificación de Outliers
+
+```{R identificacion-outliers}
+# Método del rango intercuartílico (IQR) para edad
+Q1_edad <- quantile(df_working$edad, 0.25, na.rm = TRUE)
+Q3_edad <- quantile(df_working$edad, 0.75, na.rm = TRUE)
+IQR_edad <- Q3_edad - Q1_edad
+
+# Límites para outliers en edad
+limite_inferior_edad <- Q1_edad - 1.5 * IQR_edad
+limite_superior_edad <- Q3_edad + 1.5 * IQR_edad
+
+# Identificar outliers en edad
+outliers_edad <- df_working$edad < limite_inferior_edad | 
+                 df_working$edad > limite_superior_edad | 
+                 df_working$edad < 0 | 
+                 df_working$edad > 100
+
+cat("Outliers en edad:", sum(outliers_edad, na.rm = TRUE), "\n")
+cat("Valores problemáticos en edad:\n")
+print(df_working$edad[outliers_edad])
+
+# Outliers en experiencia (valores negativos o muy altos)
+outliers_exp <- df_working$experiencia < 0 | df_working$experiencia > 50
+cat("Outliers en experiencia:", sum(outliers_exp, na.rm = TRUE), "\n")
+
+# Outliers en puntaje (fuera del rango 1-10)
+outliers_puntaje <- df_working$puntaje < 1 | df_working$puntaje > 10
+cat("Outliers en puntaje:", sum(outliers_puntaje, na.rm = TRUE), "\n")
+```
+
+### 3.2 Tratamiento de Outliers
+
+```{R tratamiento-outliers}
+# Eliminar outliers extremos en edad
+df_working <- df_working[!outliers_edad, ]
+
+# Corregir experiencia negativa (convertir a 0)
+df_working$experiencia[df_working$experiencia < 0] <- 0
+
+# Corregir experiencia muy alta (limitar a 40)
+df_working$experiencia[df_working$experiencia > 40] <- 40
+
+# Corregir puntajes fuera de rango
+df_working$puntaje[df_working$puntaje < 1] <- 1
+df_working$puntaje[df_working$puntaje > 10] <- 10
+
+cat("Filas después de limpiar outliers:", nrow(df_working), "\n")
+```
+
+## 4. Normalización de Datos
+
+### 4.1 Conversión de Salarios
+
+```{R conversion-salarios}
+# El salario está como texto, necesitamos convertirlo a numérico
+# Primero veamos algunos ejemplos
+head(df_working$salario_texto, 10)
+
+# Limpiar y convertir salarios
+df_working$salario_numerico <- df_working$salario_texto %>%
+  gsub("\\$", "", .) %>%          # Quitar signo $
+  gsub(",", "", .) %>%            # Quitar comas
+  gsub(" ", "", .) %>%            # Quitar espacios
+  gsub("\\.00$", "", .) %>%       # Quitar .00 al final
+  as.numeric()
+
+# Ver resultados
+summary(df_working$salario_numerico)
+
+# Manejar outliers en salario (muy altos o muy bajos)
+Q1_sal <- quantile(df_working$salario_numerico, 0.25, na.rm = TRUE)
+Q3_sal <- quantile(df_working$salario_numerico, 0.75, na.rm = TRUE)
+IQR_sal <- Q3_sal - Q1_sal
+
+# Identificar outliers extremos
+outliers_sal <- df_working$salario_numerico < 10000 | 
+                df_working$salario_numerico > 200000
+
+cat("Outliers extremos en salario:", sum(outliers_sal, na.rm = TRUE), "\n")
+
+# Filtrar outliers extremos de salario
+df_working <- df_working[!outliers_sal | is.na(outliers_sal), ]
+```
+
+### 4.2 Formato y Consistencia
+
+```{R formato-consistencia}
+
+# Estandarizar nombres (eliminar espacios extra y capitalizar)
+df_working <- df_working %>%
+  mutate(
+    # Estandarizar nombres (eliminar espacios extra y capitalizar)
+    nombre_limpio = nombre %>%
+      trimws() %>%                    # Eliminar espacios al inicio y final
+      gsub("\\s+", " ", .) %>%        # Reemplazar múltiples espacios con uno solo
+      tools::toTitleCase(.),          # Formato título
+    
+    # Estandarizar departamentos - FIXED: wrapped case_when in {}
+    departamento_limpio = {
+      temp_dept <- departamento %>% trimws() %>% tolower()
+      case_when(
+        temp_dept %in% c("ventas", "venta") ~ "Ventas",
+        temp_dept %in% c("marketing") ~ "Marketing",
+        temp_dept %in% c("recursos humanos", "rrhh") ~ "Recursos Humanos",
+        temp_dept %in% c("sistemas", "it") ~ "Sistemas",
+        temp_dept %in% c("finanzas") ~ "Finanzas",
+        TRUE ~ tools::toTitleCase(temp_dept)
+      )
+    },
+    
+    # Estandarizar género - FIXED: avoid piping directly into case_when
+    genero_limpio = case_when(
+      toupper(genero) %in% c("M", "MASCULINO", "H") ~ "Masculino",
+      toupper(genero) %in% c("F", "FEMENINO", "MUJER") ~ "Femenino",
+      TRUE ~ genero
+    )
+  )
+
+# Ver resultados
+table(df_working$departamento_limpio, useNA = "ifany")
+table(df_working$genero_limpio, useNA = "ifany")
+```
+
+### 4.3 Conversión de Fechas
+
+```{R conversion-fechas}
+# Convertir fechas de ingreso
+# Primero veamos el formato actual
+head(df_working$fecha_ingreso, 10)
+
+# Convertir fechas válidas
+df_working$fecha_ingreso_date <- as.Date(df_working$fecha_ingreso, format = "%d/%m/%Y")
+
+# Identificar fechas problemáticas (futuras o muy antiguas)
+fechas_problema <- df_working$fecha_ingreso_date > Sys.Date() | 
+                   df_working$fecha_ingreso_date < as.Date("1990-01-01")
+
+cat("Fechas problemáticas:", sum(fechas_problema, na.rm = TRUE), "\n")
+
+# Filtrar fechas problemáticas
+df_working$fecha_ingreso_date[fechas_problema] <- NA
+
+# Ver resultado
+summary(df_working$fecha_ingreso_date)
+```
+
+## 5. Validación de Datos
+
+### 5.1 Verificación de Rangos
+
+```{R verificacion-rangos}
+# Verificar rangos lógicos en edad
+cat("Rango de edades:", range(df_working$edad, na.rm = TRUE), "\n")
+
+# Verificar que no hay salarios negativos o extremos
+cat("Rango de salarios:", range(df_working$salario_numerico, na.rm = TRUE), "\n")
+
+# Verificar experiencia
+cat("Rango de experiencia:", range(df_working$experiencia, na.rm = TRUE), "\n")
+
+# Verificar puntajes
+cat("Rango de puntajes:", range(df_working$puntaje, na.rm = TRUE), "\n")
+
+# Mostrar casos problemáticos si los hay
+problemas_edad <- df_working[df_working$edad < 18 | df_working$edad > 65, ]
+if(nrow(problemas_edad) > 0) {
+  cat("Casos con edades fuera del rango laboral típico:\n")
+  print(problemas_edad[, c("id", "edad", "experiencia")])
+}
+```
+
+### 5.2 Consistencia entre Variables
+
+```{R consistencia-variables}
+# Verificar consistencia entre edad y experiencia
+# La experiencia no debería ser mayor que edad - 16
+inconsistencia <- df_working$experiencia > (df_working$edad - 16)
+cat("Casos con experiencia inconsistente:", sum(inconsistencia, na.rm = TRUE), "\n")
+
+if(sum(inconsistencia, na.rm = TRUE) > 0) {
+  cat("Casos problemáticos:\n")
+  print(df_working[inconsistencia, c("id", "edad", "experiencia")])
+  
+  # Corregir ajustando experiencia
+  df_working$experiencia[inconsistencia] <- pmax(0, df_working$edad[inconsistencia] - 18)
+}
+
+# Verificar que las fechas de ingreso sean coherentes con la experiencia
+df_working$años_desde_ingreso <- as.numeric(Sys.Date() - df_working$fecha_ingreso_date) / 365.25
+diferencia_exp <- abs(df_working$experiencia - df_working$años_desde_ingreso)
+casos_inconsistentes <- diferencia_exp > 5 & !is.na(diferencia_exp)
+
+cat("Casos con experiencia y fecha de ingreso inconsistentes:", sum(casos_inconsistentes, na.rm = TRUE), "\n")
+```
+
+## 6. Eliminación de Duplicados
+
+### 6.1 Identificación de Duplicados
+
+```{R identificacion-duplicados}
+# Filas completamente duplicadas
+filas_duplicadas <- sum(duplicated(df_working))
+cat("Filas completamente duplicadas:", filas_duplicadas, "\n")
+
+# Duplicados por ID
+ids_duplicados <- sum(duplicated(df_working$id, incomparables = NA))
+cat("IDs duplicados:", ids_duplicados, "\n")
+
+# Ver los duplicados por ID
+if(ids_duplicados > 0) {
+  duplicados_id <- df_working[df_working$id %in% df_working$id[duplicated(df_working$id)], ]
+  print(duplicados_id[order(duplicados_id$id), c("id", "nombre_limpio", "edad")])
+}
+
+# Duplicados en nombre (posibles personas repetidas)
+duplicados_nombre <- df_working[duplicated(df_working$nombre_limpio) | 
+                               duplicated(df_working$nombre_limpio, fromLast = TRUE), ]
+if(nrow(duplicados_nombre) > 0) {
+  cat("Posibles nombres duplicados:", nrow(duplicados_nombre), "\n")
+}
+```
+
+### 6.2 Eliminación de Duplicados
+
+```{R eliminacion-duplicados}
+# Eliminar filas completamente duplicadas
+df_working <- df_working[!duplicated(df_working), ]
+
+# Para IDs duplicados, mantener el registro más completo
+# (el que tenga menos NA)
+df_working <- df_working %>%
+  group_by(id) %>%
+  # Calculate NA count for each row within each group
+  mutate(na_count = rowSums(is.na(across(everything())))) %>%
+  slice_min(na_count, n = 1, with_ties = FALSE) %>%
+  select(-na_count) %>%  # Remove the helper column
+  ungroup()
+
+cat("Filas después de eliminar duplicados:", nrow(df_working), "\n")
+```
+
+## 7. Restructuración de Datos
+
+### 7.1 Seleccionar y Renombrar Variables Finales
+
+```{R restructuracion}
+
+# Seleccionar las columnas limpias y renombrarlas
+df_final <- df_working %>%
+  select(
+    id = id,
+    nombre = nombre_limpio,
+    edad = edad,
+    salario = salario_numerico,
+    departamento = departamento_limpio,
+    fecha_ingreso = fecha_ingreso,
+    email = email,
+    telefono = telefono,
+    genero = genero_limpio,
+    estado_civil = estado_civil,
+    experiencia = experiencia,
+    puntaje = puntaje,
+    notas = notas
+  ) %>%
+  # Filtrar solo registros con información básica válida
+  filter(!is.na(id), !is.na(edad), !is.na(salario))
+
+# Mostrar estructura final
+str(df_final)
+```
+
+### 7.2 Crear Variables Derivadas
+
+```{R variables-derivadas}
+
+df_final <- df_final %>%
+  mutate(
+    # Crear categorías de edad
+    grupo_edad = case_when(
+      edad < 30 ~ "Joven",
+      edad < 50 ~ "Adulto",
+      TRUE ~ "Mayor"
+    ),
+    
+    # Categorizar salario
+    categoria_salario = case_when(
+      salario < 40000 ~ "Bajo",
+      salario < 70000 ~ "Medio",
+      TRUE ~ "Alto"
+    ),
+    
+    # Calcular años desde ingreso - FIXED: handle non-date values
+    años_empresa = case_when(
+      is.na(fecha_ingreso) ~ NA_real_,
+      !is.na(fecha_ingreso) ~ as.numeric(Sys.Date() - as.Date(fecha_ingreso)) / 365.25,
+      TRUE ~ NA_real_
+    ),
+    
+    # Categorizar experiencia
+    nivel_experiencia = case_when(
+      experiencia < 5 ~ "Junior",
+      experiencia < 15 ~ "Semi-Senior",
+      TRUE ~ "Senior"
+    ),
+    
+    # Crear score combinado - FIXED: handle NA values in años_empresa
+    score_empleado = (puntaje * 0.6) + 
+                     (pmin(experiencia, 20, na.rm = TRUE) * 0.2) + 
+                     (pmin(coalesce(años_empresa, 0), 10) * 0.2)
+  )
+
+# Ver las nuevas variables
+table(df_final$grupo_edad)
+table(df_final$categoria_salario)
+table(df_final$nivel_experiencia)
+
+# Check the años_empresa calculation
+summary(df_final$años_empresa)
+
+```
+
+## 8. Uso de dplyr para Limpieza Eficiente
+
+```{R limpieza-dplyr}
+library(dplyr)
+
+df_clean_dplyr <- df %>%
+  # Filtrar datos válidos básicos
+  filter(!is.na(id), 
+         !is.na(edad), edad > 17, edad < 70,
+         !is.na(salario_texto)) %>%
+  
+  # Limpiar y transformar datos
+  mutate(
+    # Limpiar nombres
+    nombre_clean = trimws(nombre) %>% 
+      gsub("\\s+", " ", .) %>% 
+      tools::toTitleCase(.),
+    
+    # Convertir salario
+    salario_clean = salario_texto %>%
+      gsub("[\\$,\\s]", "", .) %>%
+      gsub("\\.00$", "", .) %>%
+      as.numeric(),
+    
+    # Estandarizar departamento
+    depto_clean = case_when(
+      tolower(trimws(departamento)) %in% c("ventas", "venta") ~ "Ventas",
+      tolower(trimws(departamento)) %in% c("marketing") ~ "Marketing",
+      tolower(trimws(departamento)) %in% c("recursos humanos", "rrhh") ~ "RRHH",
+      tolower(trimws(departamento)) %in% c("sistemas", "it") ~ "IT",
+      tolower(trimws(departamento)) %in% c("finanzas") ~ "Finanzas",
+      TRUE ~ "Otros"
+    ),
+    
+    # Limpiar género
+    genero_clean = case_when(
+      toupper(genero) %in% c("M", "MASCULINO", "H") ~ "M",
+      toupper(genero) %in% c("F", "FEMENINO", "MUJER") ~ "F",
+      TRUE ~ "Otro"
+    )
+  ) %>%
+  
+  # Filtrar outliers de salario
+  filter(salario_clean >= 20000, salario_clean <= 150000) %>%
+  
+  # Seleccionar columnas relevantes
+  select(id, nombre_clean, edad, salario_clean, depto_clean, 
+         genero_clean, experiencia, puntaje) %>%
+  
+  # Eliminar duplicados
+  distinct() %>%
+  
+  # Ordenar
+  arrange(id)
+
+cat("Dataset final con dplyr:", nrow(df_clean_dplyr), "filas\n")
+```
+
+## 9. Validación Final
+
+### 9.1 Verificaciones Post-Limpieza
+
+```{R validacion-final}
+# Verificar estructura final
+str(df_final)
+
+# Verificar que no hay NA en campos críticos
+cat("NA en campos críticos:\n")
+cat("ID:", sum(is.na(df_final$id)), "\n")
+cat("Edad:", sum(is.na(df_final$edad)), "\n")
+cat("Salario:", sum(is.na(df_final$salario)), "\n")
+
+# Verificar rangos finales
+cat("\nRangos finales:\n")
+cat("Edad:", range(df_final$edad, na.rm = TRUE), "\n")
+cat("Salario:", range(df_final$salario, na.rm = TRUE), "\n")
+cat("Experiencia:", range(df_final$experiencia, na.rm = TRUE), "\n")
+cat("Puntaje:", range(df_final$puntaje, na.rm = TRUE), "\n")
+
+# Verificar categorías
+cat("\nDistribución por categorías:\n")
+table(df_final$grupo_edad)
+table(df_final$departamento)
+table(df_final$genero)
+
+# Comparar antes y después
+cat("\nComparación antes y después:\n")
+cat("Filas originales:", nrow(df), "\n")
+cat("Filas después de limpieza:", nrow(df_final), "\n")
+cat("Porcentaje retenido:", round(nrow(df_final)/nrow(df)*100, 2), "%\n")
+
+# Resumen de calidad
+cat("\nCalidad final del dataset:\n")
+cat("Total de celdas:", nrow(df_final) * ncol(df_final), "\n")
+cat("Celdas con NA:", sum(is.na(df_final)), "\n")
+cat("Porcentaje completitud:", round((1 - sum(is.na(df_final))/(nrow(df_final) * ncol(df_final)))*100, 2), "%\n")
+```
+
+## 10. Mejores Prácticas
+
+### 10.1 Documentación del Proceso
+
+```{R documentacion}
+# Mantener registro de cambios
+limpieza_log <- data.frame(
+  paso = c("Datos originales", 
+           "Eliminar outliers edad", 
+           "Convertir salarios", 
+           "Estandarizar categorías",
+           "Eliminar duplicados",
+           "Dataset final"),
+  filas = c(nrow(df), 
+            nrow(df_working), 
+            nrow(df_working), 
+            nrow(df_working),
+            nrow(df_working),
+            nrow(df_final)),
+  columnas = c(ncol(df), ncol(df_working), ncol(df_working) + 1, 
+               ncol(df_working) + 3, ncol(df_working) + 3, ncol(df_final)),
+  completitud = c(round((1 - sum(is.na(df))/(nrow(df) * ncol(df)))*100, 1),
+                  round((1 - sum(is.na(df_working))/(nrow(df_working) * ncol(df_working)))*100, 1),
+                  round((1 - sum(is.na(df_working))/(nrow(df_working) * ncol(df_working)))*100, 1),
+                  round((1 - sum(is.na(df_working))/(nrow(df_working) * ncol(df_working)))*100, 1),
+                  round((1 - sum(is.na(df_working))/(nrow(df_working) * ncol(df_working)))*100, 1),
+                  round((1 - sum(is.na(df_final))/(nrow(df_final) * ncol(df_final)))*100, 1))
+)
+
+print(limpieza_log)
+```
+
+### 10.2 Funciones Reutilizables
+
+```{R funciones-reutilizables}
+# Función para limpieza básica del dataset generado
+limpiar_dataset_empleados <- function(df) {
+  df %>%
+    # Filtrar registros válidos básicos
+    filter(!is.na(id), !is.na(edad), edad > 0, edad < 100) %>%
+    
+    # Limpiar texto
+    mutate(across(where(is.character), ~trimws(.))) %>%
+    
+    # Convertir salarios
+    mutate(salario_numerico = salario_texto %>%
+             gsub("[\\$,\\s]", "", .) %>%
+             gsub("\\.00$", "", .) %>%
+             as.numeric()) %>%
+    
+    # Filtrar salarios válidos
+    filter(salario_numerico > 0, salario_numerico < 500000) %>%
+    
+    # Eliminar duplicados
+    distinct(id, .keep_all = TRUE) %>%
+    
+    # Ordenar
+    arrange(id)
+}
+
+# Función para detectar outliers mejorada
+detectar_outliers_mejorado <- function(x, factor = 1.5) {
+  Q1 <- quantile(x, 0.25, na.rm = TRUE)
+  Q3 <- quantile(x, 0.75, na.rm = TRUE)
+  IQR <- Q3 - Q1
+  limite_inf <- Q1 - factor * IQR
+  limite_sup <- Q3 + factor * IQR
+  
+  list(
+    outliers = x < limite_inf | x > limite_sup,
+    limite_inferior = limite_inf,
+    limite_superior = limite_sup,
+    cantidad = sum(x < limite_inf | x > limite_sup, na.rm = TRUE)
+  )
+}
+
+# Probar la función de limpieza
+df_prueba <- limpiar_dataset_empleados(df)
+cat("Resultado función de limpieza:", nrow(df_prueba), "filas\n")
+
+# Probar función de outliers
+outliers_edad <- detectar_outliers_mejorado(df_final$edad)
+cat("Outliers detectados en edad:", outliers_edad$cantidad, "\n")
+```
+
+## Conclusión
+
+La limpieza de datos es un proceso iterativo que requiere:
+
+- Comprensión profunda de los datos y su contexto
+- Aplicación sistemática de técnicas de validación  
+- Documentación clara de todos los cambios realizados
+- Verificación constante de la calidad de los datos
+
+Un dataset bien limpio es la base para análisis confiables y resultados reproducibles. El tiempo invertido en esta etapa se traduce en mayor precisión y confiabilidad en los análisis posteriores.
+
+```{R export-final}
+# Exportar dataset limpio final
+write.csv(df_final, "dataset_empleados_limpio.csv", row.names = FALSE)
+# cat("Dataset limpio exportado como: dataset_empleados_limpio.csv\n")
+```

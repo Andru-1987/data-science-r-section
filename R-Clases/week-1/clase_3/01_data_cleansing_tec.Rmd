@@ -1,25 +1,62 @@
 # Data Cleansing Techniques in R
+Que vamos a realizar en este sector? 
+- Aprenderemos un poco sobre como limpiamos datos dentro de un dataframe para su proximo 
+- Ordernaremos datos
+- Graficaremos de manera eficiente los datos nulls, para evaluar la nullidad de manera visual
 
 ## 1. Limpieza de datos (Data Cleaning)
 
 ### Handling missing values
-```{R}
+```{R , include=FALSE}
+library(utils)
+
+csv_uri <- "https://gist.githubusercontent.com/Andru-1987/d1a4296d140d8678dfb78acad47963e7/raw/83f3c954388a9b9f0e332c27fa3ccaead464c98b/dataset_to_clean.csv"
+df <- read.csv(csv_uri)
+
 # Check for missing values
 sum(is.na(df))
 colSums(is.na(df))
 
+
+column <- "Year"
 # Remove rows with any NA values
 df_clean <- na.omit(df)
 
+freq_table <- table(df[[column]])
+barplot(
+  freq_table,
+  main="Frecuencia de valores unicos de Year",
+  xlab="Year",
+  ylab="Q",
+  col="skyblue",
+  border="gray"
+)
+
+text(x = 1:length(freq_table), y=freq_table/2, labels=freq_table, pos=3)
+
 # Replace NA with mean/mode
-df$column[is.na(df$column)] <- mean(df$column, na.rm = TRUE)
+df[[column]][is.na(df[[column]])] <- mean(df[[column]], na.rm = TRUE)
+
+freq_table <- table(df[[column]])
+
+barplot(
+  freq_table,
+  main="Frecuencia de valores unicos de Year",
+  xlab="Year",
+  ylab="Q",
+  col="skyblue",
+  border="gray"
+)
+
+text(x = 1:length(freq_table), y=freq_table/2, labels=freq_table, pos=3)
+
 ```
 
 ### Removing duplicates
 ```{R}
 df_unique <- unique(df)
-# Or
-df_nodups <- df[!duplicated(df), ]
+
+str(df_unique)
 ```
 
 ### Outlier detection and treatment
@@ -37,23 +74,60 @@ df$column <- Winsorize(df$column, probs = c(0.05, 0.95))
 
 ### Case conversion
 ```{R}
-df$text_column <- tolower(df$text_column)
-df$text_column <- toupper(df$text_column)
-df$text_column <- tools::toTitleCase(df$text_column)
+
+if(! "wordcloud" %in% installed.packages()[,"Package"]){
+  install.packages("wordcloud")
+}
+
+library(wordcloud)
+
+df$Country <- tolower(df$Country)
+df$Country <- toupper(df$Country)
+df$Country <- tools::toTitleCase(df$Country)
+
+head(df$Country)
+
+# Cargar las librerías
+library(wordcloud)
+library(tm)
+library(dplyr)
+
+# Crear datos de ejemplo
+ciudades <- unique(df$Country) 
+
+# Contar frecuencias
+freq_cuidades <- table(df$Country)
+
+freq_ciudades
+
+# # Crear nube de palabras básica
+wordcloud(names(freq_palabras), freq_palabras, 
+          min.freq = 1,
+          # scale = c(3, 0.5),
+          colors = brewer.pal(8, "Dark2"),
+          random.order = FALSE,
+          rot.per = 0.35)
+
 ```
 
 ### Removing special characters
 ```{R}
-df$text_column <- gsub("[^[:alnum:][:space:]]", "", df$text_column)
+df$Country <- gsub("[^[:alnum:][:space:]]", "", df$Country)
+
+glimpse(df)
 ```
 
 ### Standardizing formats
 ```{R}
 # Dates
-df$date_column <- as.Date(df$date_column, format = "%m/%d/%Y")
+fecha_random <- sample(seq(as.Date("2020-01-01"), Sys.Date(), by= "day"), nrow(df),replace = TRUE)
+
+df$fecha_registro <- format(fecha_random, "%m/%d/%Y")
+df$fecha_registro <- as.Date(df$fecha_registro, format = "%m/%d/%Y")
 
 # Numbers
-df$numeric_column <- format(round(df$numeric_column, 2), nsmall = 2)
+# df$numeric_column <- format(round(df$numeric_column, 2), nsmall = 2)
+glimpse(df)
 ```
 
 ## 3. Mapeado de datos categóricos (Categorical Data Mapping)
@@ -97,32 +171,32 @@ df <- df %>% mutate(value = 1) %>%
 
 ### Trimming whitespace
 ```{R}
-df$text_column <- trimws(df$text_column)
+df$Country <- trimws(df$Country)
 ```
 
 ### Splitting strings
 ```{R}
 # Split into multiple columns
-df <- separate(df, text_column, into = c("part1", "part2"), sep = ",")
+df <- separate(df, Country, into = c("part1", "part2"), sep = ",")
 
 # Split into list
-split_strings <- strsplit(df$text_column, ",")
+split_strings <- strsplit(df$Country, ",")
 ```
 
 ### String replacement
 ```{R}
-df$text_column <- gsub("old_text", "new_text", df$text_column)
+df$Country <- gsub("old_text", "new_text", df$Country)
 ```
 
 ### Extracting patterns
 ```{R}
 library(stringr)
-df$extracted <- str_extract(df$text_column, "[0-9]+") # extract numbers
+df$extracted <- str_extract(df$Country, "[0-9]+") # extract numbers
 ```
 
 ### String length
 ```{R}
-df$length <- nchar(df$text_column)
+df$length <- nchar(df$Country)
 ```
 
 ### Concatenation
