@@ -1,0 +1,134 @@
+---
+title: "R: ETL & EDA"
+author: "Anderson Ocaña"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    number_sections: true
+    highlight: tango
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    highlight: tango
+    code_folding: show
+fontsize: 10pt
+geometry: margin=1in
+---
+
+## Instalacion de depencias como tidyverse
+```{R instalacion-de-dependencias}
+dependency <- c("tidyverse","DT","RSQLite","ggplot2","DBI")
+needed_to_install <- dependency[ !(dependency %in% installed.packages()[,"Package"])]
+
+# ciclos for
+lapply(needed_to_install, install.packages)
+```
+
+
+```{R llamado-librerias}
+# library(tidyverse)
+library(DT)
+library(RSQLite)
+library(ggplot2)
+library(stringr)
+```
+
+## Iris Dataset
+```{R llamado-dataset}
+data(iris)
+str(iris)
+
+print("Estadistica rapida del dataset por medio de summary")
+summary(iris)
+```
+
+
+```{R check-de-los-datos}
+head( iris , 2)
+
+print("nombre de las columnas")
+names(iris)
+```
+
+
+## Cambiar los `.` por `_`
+```{R limpieza-data-columns}
+
+iris_clean <- iris
+names(iris_clean) <- gsub("\\.", "_", names(iris))
+str(iris_clean)
+
+```
+
+## Mutacion del dataset -> obtener el ratio de sepal = longitud / ancho
+```{R transformacion-del-dataset}
+iris_clean$Sepal_Ratio <- iris_clean$Sepal_Length / iris_clean$Sepal_Width
+head(iris_clean, 2)
+```
+
+```{R transformacion-del-dataset-usando-pipe}
+
+# dataframe base -> transformacion(renombro columnas) -> transformacion (generar una columna en base a un calculo que es el ratio) ->(output) un dataframe con las modificaciones pertinentes
+iris_clean_dplyr <- iris %>% 
+    rename_with(~str_replace_all(., "[.]","_")) %>%
+    mutate(Sepal_Ratio = Sepal_Length / Sepal_Width)
+
+str(iris_clean_dplyr)
+```
+
+## Guardar la transformacion en un archivo local csv
+```{R guardado-dataset-clean}
+csv_path <- "/workspaces/R-Clases/week-1/clase_2/codigo_clase/storage/iris.csv"
+write.csv(iris_clean_dplyr, csv_path)
+```
+
+
+## Guardar la transformacion en un archivo local csv
+```{R guardado-dataset-en-base-datps}
+library(DBI)
+
+## MySQL
+iris_database_sqlite <- "/workspaces/R-Clases/week-1/clase_2/database/iris_sqlite.db"
+
+# como me conecto
+cnx <- dbConnect(SQLite(), iris_database_sqlite)
+
+# guardar este dataset limpio, directamente en esta base de datos -> esta tabla particular
+dbWriteTable(cnx, "iris_cleaned_stage", iris_clean_dplyr, overwrite = TRUE)
+
+# para verficar que eso fue realizado con exito
+# traer la data que vive en esa base datos -> por medio de una query SQL
+get_from_database <- dbGetQuery(cnx, "SELECT Sepal_Ratio, Sepal_Length, Petal_Length FROM iris_cleaned_stage LIMIT 10")
+
+# salida por la terminal para viz los datos
+print(get_from_database)
+
+# cerrar conx
+dbDisconnect(cnx)
+
+glimpse(get_from_database)
+```
+
+
+```{R agg-table}
+
+    aggr_tbl <- iris_clean %>%
+        group_by(Species) %>%
+        summarise( media_sepal_length = mean(Sepal_Length), media_sepal_width = mean(Sepal_Width))
+
+    print(aggr_tbl)
+```
+
+# Extra  Challenge:
+
+github_dataset <- "https://raw.githubusercontent.com/Andru-1987/csv_files_ds/refs/heads/main/Customers.csv"
+
+obtener los datos 
+- modificar algunos datos columnas como ejemplo:  retirar todas las tildes, characteres que tengar virgilla, chars no del lenguaje ingles
+- llevar a mayusculas todos los paises
+- agregar una columna : `edad_aleatoria` con una edad, generada de manera aleatoria
+- hacer una tabla summarise -> paises con la cantidad total de customers, cantiddad de ciudades por pais.
+
+(Optional -> hacer un grafico con ggplot)

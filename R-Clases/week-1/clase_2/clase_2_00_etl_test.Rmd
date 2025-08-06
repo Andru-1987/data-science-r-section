@@ -35,10 +35,10 @@ lapply(needed_to_install, install.packages)
 ```
 
 
-```{r setup, include=FALSE}
+```{R setup, include=FALSE}
 # Carga de librerías clave
 
-library(tidyverse)   # dplyr, ggplot2, readr, etc.
+library(tidyverse)   # dplyr, ggplot2, readr, etc.  
 library(DT)          # Tablas interactivas
 library(plotly)      # Gráficos interactivos
 library(corrplot)    # Mapa de correlaciones

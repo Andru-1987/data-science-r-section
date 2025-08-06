@@ -96,3 +96,5 @@ Podés cambiar `theme:` por cualquiera de estos valores:
 | `darkly`     | Tema oscuro elegante                      |
 | `slate`      | Tema oscuro intermedio                    |
 | `superhero`  | Tema oscuro con colores vibrantes         |
+
+- [LINK DPLYR Manipulacion de datos](https://rsanchezs.gitbooks.io/rprogramming/content/chapter9/dplyr.html)
