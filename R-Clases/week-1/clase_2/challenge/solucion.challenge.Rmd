@@ -1,0 +1,165 @@
+# Challenge de Manipulación de Datos con R
+
+```{R lib-load}
+missing_dependencies <- c("dplyr","stringr","readr","ggplot2","tidyr")
+missing_dependencies <- missing_dependencies[!missing_dependencies %in% installed.packages()[,"Package"]]
+lapply(missing_dependencies,install.packages)
+```
+
+# Cargar las librerías necesarias
+```{R lib-load}
+library(dplyr)
+library(stringr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+```
+
+# Importar el conjunto de datos
+```{R load-data}
+url <- "https://raw.githubusercontent.com/Andru-1987/csv_files_ds/refs/heads/main/Customers.csv"
+clientes_raw <- read_csv(url)
+
+# Explorar la estructura inicial de los datos
+cat("Estructura inicial de los datos:\n")
+str(clientes_raw)
+cat("\nPrimeras 5 filas:\n")
+head(clientes_raw, 5)
+```
+
+
+# Función para limpiar texto: eliminar acentos y caracteres especiales
+```{R clean-data}
+clientes_limpio <- clientes_raw %>%
+  mutate(across(
+    where(is.character),
+    ~ .x %>%
+      as.character() %>%
+    #   esto es basicamente la normalizacion con respecto a data 
+      str_replace_all("á|à|ä|â", "a") %>%
+      str_replace_all("é|è|ë|ê", "e") %>%
+      str_replace_all("í|ì|ï|î", "i") %>%
+      str_replace_all("ó|ò|ö|ô", "o") %>%
+      str_replace_all("ú|ù|ü|û", "u") %>%
+      str_replace_all("Á|À|Ä|Â", "A") %>%
+      str_replace_all("É|È|Ë|Ê", "E") %>%
+      str_replace_all("Í|Ì|Ï|Î", "I") %>%
+      str_replace_all("Ó|Ò|Ö|Ô", "O") %>%
+      str_replace_all("Ú|Ù|Ü|Û", "U") %>%
+      str_replace_all("ñ", "n") %>%
+      str_replace_all("Ñ", "N") %>%
+      str_replace_all("[^a-zA-Z0-9\\s\\-\\.]", "")
+  ))
+
+cat("\nDatos después de la limpieza de texto:\n")
+head(clientes_limpio, 5)
+```
+
+
+# transfomacion
+
+# Convertir nombres de países a MAYÚSCULAS y agregar edad aleatoria
+```{R conversion-mutacion}
+set.seed(123) 
+
+valores <- 18:80
+probs <- dnorm(valores, mean = 35, sd = 12) 
+
+clientes_transformado <- clientes_limpio %>%
+  mutate( # que hace esta funcion de dplyr? permite hacer una transformacion en varias columnas
+    # Convertir país a mayúsculas (asumiendo que hay una columna de país)
+    Country = toupper(Country), 
+    # Crear edad aleatoria (entre 18 y 80 años, distribución realista)
+    edad_aleatoria = sample(valores, n(), replace = TRUE, prob = probs )
+  )
+
+
+cat("\nDatos después de transformaciones:\n")
+head(clientes_transformado)
+```
+
+
+# ANÁLISIS DE DATOS
+
+```{R agg-table}
+# Crear tabla resumen
+  tabla_resumen <- 
+    clientes_transformado %>%
+    group_by(Country) %>%
+    summarise(
+      total_clientes = n(),
+      ciudades_unicas = n_distinct((City), na.rm = TRUE),
+      .groups = 'drop'
+    ) %>%
+    arrange(desc(total_clientes))
+  
+  cat("\n=== TABLA RESUMEN ===\n")
+  print(tabla_resumen)
+  
+```
+
+# ESTADÍSTICAS ADICIONALES
+```{R stats}
+cat("\n=== ESTADÍSTICAS GENERALES ===\n")
+cat(paste("Total de registros:", nrow(clientes_transformado)))
+cat(paste("\nTotal de columnas:", ncol(clientes_transformado)))
+
+cat(paste("\nTotal de países:", nrow(tabla_resumen)))
+cat(paste("Total de ciudades únicas:", sum(tabla_resumen$ciudades_unicas)))
+
+cat("\n=== ESTADÍSTICAS DE EDAD ALEATORIA ===\n")
+edad_stats <- clientes_transformado %>%
+  summarise(
+    edad_min = min(edad_aleatoria, na.rm = TRUE),
+    edad_max = max(edad_aleatoria, na.rm = TRUE),
+    edad_promedio = round(mean(edad_aleatoria, na.rm = TRUE), 2),
+    edad_mediana = median(edad_aleatoria, na.rm = TRUE)
+  )
+print(edad_stats)
+glimpse(clientes_transformado)
+```
+
+# 5. VISUALIZACIÓN (DESAFÍO ADICIONAL)
+# =====================================
+
+if (exists("tabla_resumen") && nrow(tabla_resumen) > 0) {
+  # Gráfico de barras para distribución de clientes por país
+  grafico_paises <- ggplot(tabla_resumen, aes(x = reorder(!!sym(col_pais), total_clientes), 
+                                              y = total_clientes)) +
+    geom_bar(stat = "identity", fill = "steelblue", alpha = 0.7) +
+    coord_flip() +
+    labs(
+      title = "Distribución de Clientes por País",
+      x = "País",
+      y = "Número de Clientes",
+      caption = "Datos procesados y transformados"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.text = element_text(size = 10),
+      axis.title = element_text(size = 12)
+    ) +
+    geom_text(aes(label = total_clientes), hjust = -0.1, size = 3)
+  
+  print(grafico_paises)
+  
+  # Gráfico de distribución de edades
+  grafico_edades <- ggplot(clientes_transformado, aes(x = edad_aleatoria)) +
+    geom_histogram(binwidth = 5, fill = "coral", alpha = 0.7, color = "black") +
+    labs(
+      title = "Distribución de Edades Aleatorias",
+      x = "Edad",
+      y = "Frecuencia",
+      caption = "Edades generadas aleatoriamente"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+    )
+  
+  print(grafico_edades)
+  
+} else {
+  cat("\nNo se pudo crear la visualización debido a problemas con las columnas de datos.")
+}

@@ -1,0 +1,44 @@
+# Challenge de Manipulacion de datos con R:
+
+## Contexto
+En este desafío, trabajarás con un conjunto de datos de clientes y realizarás varias tareas de transformación de datos utilizando R. Este ejercicio te ayudará a practicar técnicas de limpieza, manipulación y análisis básico de datos utilizando paquetes como dplyr y tidyr.
+
+## Conjunto de Datos
+El dataset está disponible en: https://raw.githubusercontent.com/Andru-1987/csv_files_ds/refs/heads/main/Customers.csv
+
+## Tareas
+
+### 1. Importación y Limpieza Inicial de Datos
+- Importar el conjunto de datos de clientes utilizando las funciones apropiadas de R
+- Limpiar los datos de texto mediante:
+  - Eliminación de acentos (tildes) de los caracteres
+  - Eliminación de caracteres especiales (como ñ)
+  - Estandarización del texto para usar solo caracteres del alfabeto inglés
+
+### 2. Transformación de Datos
+- Convertir todos los nombres de países a MAYÚSCULAS
+- Crear una nueva columna llamada `edad_aleatoria` con valores de edad generados aleatoriamente: Utilizar rangos de edad apropiados que tengan sentido para una base de datos de clientes
+
+### 3. Análisis de Datos
+Crear una tabla resumen que incluya:
+- Número total de clientes por país
+- Número de ciudades únicas por país
+
+### Desafío Adicional (Opcional)
+Crear una visualización utilizando ggplot2 que represente efectivamente la distribución de clientes entre diferentes países.
+
+## Resultados Esperados
+1. Un conjunto de datos limpio con todas las transformaciones requeridas
+2. Una tabla resumen con las estadísticas solicitadas
+3. (Opcional) Una visualización de los datos
+
+## Consejos
+- Considera usar el paquete stringr para la manipulación de texto
+- El paquete dplyr será útil para crear estadísticas resumen
+- Piensa en rangos de edad apropiados al generar edades aleatorias
+
+## Criterios de Evaluación
+- Eficiencia y claridad del código
+- Implementación correcta de todas las transformaciones requeridas
+- Cálculo correcto de las estadísticas resumen
+- (Si se intenta el bonus) Efectividad de la visualización
