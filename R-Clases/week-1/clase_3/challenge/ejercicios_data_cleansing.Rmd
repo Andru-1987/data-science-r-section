@@ -1,4 +1,4 @@
-## Ejercicio 1: Limpieza Básica de Datos
+## Challenge Limpieza de Datos parte 2
 
 **Enunciado:**
 Crea un dataframe con los siguientes datos problemáticos y aplica estas operaciones:

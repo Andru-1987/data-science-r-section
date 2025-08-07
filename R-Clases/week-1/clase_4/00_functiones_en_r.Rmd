@@ -1,0 +1,110 @@
+---
+title: "Funciones en R"
+author: "Anderson Ocaña"
+output: html_notebook
+---
+
+Perfecto, acá tenés el contenido de la clase sin emojis, con una estructura clara para estudiantes de Data Science que ya manejan Python:
+
+---
+
+## Clase: Funciones y Funciones Lambda en R
+
+### Objetivo de la clase
+- Entender cómo se definen y utilizan funciones en R.
+- Introducir funciones anónimas (lambda).
+- Comparar sintaxis y uso entre R y Python.
+- Aplicar funciones para resolver problemas de análisis de datos.
+
+---
+
+## ¿Qué es una función?
+Una función es un bloque de código que toma una entrada, realiza operaciones y devuelve una salida.
+
+```{R}
+nombre_funcion <- function(arg1, arg2 = valor_por_defecto) {
+  # cuerpo de la función
+  return(valor)
+}
+```
+
+### Ejemplo
+
+```{R}
+# creacion de la funcion
+suma <- function(a, b) {
+  return(a + b)
+}
+# llamada de la funcion
+suma(3, 5)
+```
+
+
+*Notas clave:*
+> - Las funciones en R pueden devolver el último valor evaluado sin `return()`.
+> - Los argumentos pueden tener valores por defecto.
+> - Se puede usar `...` para argumentos variables como `*args` en Python. (rest params)
+
+---
+
+En R, las funciones son ciudadanos de primera clase, como en Python.
+
+```{R}
+f <- function(x) x^2
+f(4)
+```
+
+---
+
+## Funciones lambda (anónimas)
+_Son funciones sin nombre que se definen en el lugar donde se necesitan._
+
+### Ejemplo clásico
+
+```{R}
+# Con lapply
+valores <- list(1, 2, 3, 4)
+lapply(valores, function(x) x^2)
+```
+
+### Aplicar transformación a columnas
+
+```{R data-frame-apply, echo=FALSE}
+library(dplyr)
+
+df <- data.frame(valor = c(1, 2, 3, 4))
+
+df %>% 
+  mutate(valor_cuadrado = sapply(valor, function(x) x^2))
+```
+
+---
+
+## Ejercicios simples para *clase*
+
+### Ejercicio 1
+Crear una función `es_par()` que devuelva `TRUE` si un número es par.
+
+### Ejercicio 2
+Usar una lambda para calcular el logaritmo natural de una lista de números.
+
+### Ejercicio 3
+Aplicar una función anónima para clasificar edades:
+```{R}
+edades <- c(12, 20, 35, 7, 65)
+```
+
+---
+
+## Sintax advanced: `purrr::map()` (_avanzado_)
+
+```{R}
+library(purrr)
+
+map(1:5, ~ .x^2)
+```
+
+---
+## Recursos adicionales
+- [Cheat Sheet de R functions (Posit)](https://posit.co/resources/cheatsheets/)
+- [Libro R for Data Science – Capítulo de funciones](https://r4ds.hadley.nz/functions.html)
