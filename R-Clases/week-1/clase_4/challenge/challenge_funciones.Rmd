@@ -1,0 +1,76 @@
+#### **1. Funciones Básicas**
+1. **Función `es_par_o_impar`**  
+   - Implementa una función que determine si un número es par o impar.  
+   - *Reto adicional*: Modifícala para que acepte vectores de números.
+
+2. **Función `suma_dos_numeros`**  
+   - Crea una función que sume dos números y maneje casos donde los inputs no sean numéricos.
+
+3. **Función `calcular_area_rectangulo`**  
+   - Extiende la función para que calcule el área de un cuadrado si solo se proporciona un lado.
+
+---
+
+#### **2. Funciones con Bucles**
+4. **Tablas de multiplicar/dividir**  
+   - Mejora las funciones `imprimir_tabla_multiplicar` e `imprimir_tabla_dividir` para que:  
+     - Permitan especificar el rango (ej: del 1 al 15).  
+     - Formateen la salida como un dataframe en lugar de usar `cat()`.
+
+5. **Suma de números naturales**  
+   - Optimiza `sumar_naturales` para que use la fórmula matemática \( \frac{n(n+1)}{2} \) en lugar de un bucle.
+
+6. **Factorial con recursión**  
+   - Reimplementa `calcular_factorial` usando recursión en lugar de un bucle `for`.
+
+---
+
+#### **3. Funciones con Datos**
+7. **Contador de pares/impares**  
+   - Modifica `contar_pares_impares` para que devuelva un tibble con los conteos en lugar de imprimirlos.
+
+8. **Potencia con vectorización**  
+   - Reescribe `calcular_potencia` para que acepte vectores en `base` y `exponente` usando `Vectorize()`.
+
+9. **Combinación de dataframes**  
+   - Crea una función que:  
+     - Una dos dataframes por filas (`rbind`) solo si tienen las mismas columnas.  
+     - Valide tipos de datos antes de combinar por columnas (`cbind`).
+
+---
+
+#### **4. Funciones Avanzadas**
+10. **Análisis de palíndromos**  
+    - Extiende `es_palindromo` para:  
+      - Ignorar signos de puntuación.  
+      - Detectar frases palindrómicas (ej: "Ana lleva al oso la avellana").
+
+11. **Raíz cuadrada segura**  
+    - Mejora `calcular_raiz_cuadrada` para que:  
+      - Soporte números complejos si el input es negativo.  
+      - Registre advertencias usando `warning()`.
+
+12. **Integral numérica**  
+    - Generaliza la función `integral_sigmoid` para aceptar cualquier función matemática como argumento.  
+    - Grafica la función y su integral en un mismo plot interactivo con leyendas.
+
+---
+
+#### **Optional**
+
+**Dashboard de iris**  
+    - Desarrolla una función que muestre:  
+      - Resumen estadístico de `iris`.  
+      - Matriz de correlaciones.  
+      - Gráficos de dispersión por especie con colores personalizados.
+
+---
+
+#### **6. Reto Final**
+15. **Paquete de funciones**  
+    - Organiza todas las funciones anteriores en un paquete de R llamado `misHerramientas`:  
+      - Documenta cada función con roxygen2.  
+      - Incluye ejemplos en la documentación.  
+      - Publica el paquete en GitHub.
+
+---

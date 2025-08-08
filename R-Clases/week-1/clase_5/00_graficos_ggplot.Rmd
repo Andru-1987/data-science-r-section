@@ -1,0 +1,126 @@
+# **Guía ggplot2 en R**
+
+## **1. Instalación y Conceptos Básicos**
+### Instalar ggplot2
+```r
+install.packages("ggplot2")  # Instalar
+library(ggplot2)            # Cargar
+```
+
+### Estructura básica de ggplot2:
+```r
+ggplot(
+  data = datos,
+  aes(x = variable_x, y = variable_y)) +  # Capa base
+  geom_point()                                              # Capa visual
+```
+- **`data`**: Tu dataframe.
+- **`aes()`**: Estética (mapeo de variables a ejes/colores/tamaños).
+- **`geom_*()`**: Tipo de gráfico (puntos, líneas, barras, etc.).
+
+---
+
+## **2. Gráficos Esenciales**
+### **a) Gráfico de dispersión (`geom_point`)**
+```r
+ggplot(iris, aes(x = Sepal.Length, y = Sepal.Width, color = Species)) +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(title = "Longitud vs Ancho del Sépalo", x = "Longitud", y = "Ancho")
+```
+- **`color`**: Diferenciar por categoría.
+- **`size`/`alpha`**: Tamaño y transparencia.
+
+### **b) Histograma (`geom_histogram`)**
+```r
+ggplot(iris, aes(x = Sepal.Length, fill = Species)) +
+  geom_histogram(binwidth = 0.2, position = "identity", alpha = 0.6) +
+  labs(title = "Distribución de Longitud del Sépalo")
+```
+
+### **c) Boxplot (`geom_boxplot`)**
+```r
+ggplot(iris, aes(x = Species, y = Sepal.Length, fill = Species)) +
+  geom_boxplot() +
+  labs(title = "Boxplot por Especie")
+```
+
+### **d) Gráfico de líneas (`geom_line`)**
+```r
+library(dplyr)
+economics_agg <- economics %>% 
+  filter(year(date) >= 2000)
+
+ggplot(economics_agg, aes(x = date, y = unemploy)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  labs(title = "Desempleo en EE.UU. (2000-2015)")
+```
+
+---
+
+## **3. Personalización Avanzada**
+### **Temas y estilos**
+```r
+ggplot(iris, aes(x = Sepal.Length, y = Sepal.Width)) +
+  geom_point() +
+  theme_minimal() +  # Temas: theme_classic(), theme_dark(), etc.
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    axis.text = element_text(color = "blue")
+  )
+```
+
+### **Facetas (subgráficos)**
+```r
+ggplot(iris, aes(x = Sepal.Length, y = Sepal.Width)) +
+  geom_point() +
+  facet_wrap(~Species, scales = "free")  # Una faceta por especie
+```
+
+### **Leyendas y escalas**
+```r
+ggplot(iris, aes(x = Sepal.Length, y = Sepal.Width, color = Species)) +
+  geom_point() +
+  scale_color_manual(values = c("setosa" = "red", "versicolor" = "blue", "virginica" = "green")) +
+  labs(color = "Tipo de Flor")  # Renombrar leyenda
+```
+
+---
+
+## **4. Gráficos Avanzados**
+### **a) Densidad 2D (`geom_density_2d`)**
+```r
+ggplot(iris, aes(x = Sepal.Length, y = Sepal.Width)) +
+  geom_density_2d_filled() +
+  labs(title = "Densidad 2D")
+```
+
+### **b) Heatmap (`geom_tile`)**
+```r
+cor_matrix <- cor(iris[, 1:4])
+ggplot(reshape2::melt(cor_matrix), aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0)
+```
+
+### **c) Gráfico interactivo con `plotly`**
+```r
+library(plotly)
+p <- ggplot(iris, aes(x = Sepal.Length, y = Sepal.Width, color = Species)) +
+  geom_point()
+ggplotly(p)  # Convierte ggplot en interactivo
+```
+
+---
+
+## **5. Recursos Adicionales**
+1. **Cheat Sheet oficial**: [Descargar aquí](https://www.rstudio.com/resources/cheatsheets/)
+2. **Libro recomendado**: *"ggplot2: Elegant Graphics for Data Analysis"* de Hadley Wickham.
+3. **Galería de ejemplos**: [R Graph Gallery](https://r-graph-gallery.com/ggplot2-package.html)
+
+---
+
+## **Ejercicios Prácticos**
+1. Crea un scatter plot de `mpg` vs `wt` en el dataset `mtcars`, coloreando por `cyl`.
+2. Genera un histograma de `price` en `diamonds`, dividido por `cut` con facetas.
+3. Personaliza un boxplot de `hp` por `gear` (en `mtcars`) con colores manuales y tema oscuro.
+

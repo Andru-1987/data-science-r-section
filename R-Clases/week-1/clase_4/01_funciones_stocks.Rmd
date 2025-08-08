@@ -1,0 +1,180 @@
+```{R install-dependencies}
+install.packages("tidyquant")
+```
+
+```{R dependencies-importing}
+library(dplyr)
+library(tidyquant)
+library(tibble)
+```
+
+
+```{R data-manipulacion-functions}
+agregar_metricas_stocks <- function(df, 
+                                    col_precio = "close", 
+                                    col_volumen = "volume", 
+                                    n_periodos = 20) {
+#   lag -> es una funcion que se encarga de ver a futuro o atras del siguiente dato en el dataframe
+#   sym ?? --> Convertir un string (nombre de columna como texto) en un símbolo que dplyr puede evaluar.
+#   !! (unquoting): Fuerza la evaluación inmediata del símbolo dentro de dplyr. Es necesario cuando usas nombres de columnas almacenados en variables.
+  
+  required_cols <- c(col_precio, col_volumen)
+  
+  if(!all(required_cols %in% names(df))) {
+    stop(paste("El dataframe debe contener las columnas:", 
+               paste(required_cols, collapse = ", ")))
+  }
+  
+  df %>%
+    mutate(
+      # 1. Retorno diario (porcentaje)
+      
+      retorno_diario = (!!sym(col_precio) / lag(!!sym(col_precio)) - 1),
+      # 2. Media móvil de precios (simple)
+      media_movil = zoo::rollmean(!!sym(col_precio), 
+                                 k = n_periodos, 
+                                 fill = NA, 
+                                 align = "right"),
+      
+      # 3. Volumen en millones (con ajuste para ceros)
+      volumen_millones = !!sym(col_volumen) / 1e6,
+      
+      # Opcional: Volumen promedio móvil
+      .after = !!sym(col_volumen)  # Coloca las nuevas columnas después de la columna de volumen
+    ) %>%
+    # Eliminar el primer día (sin retorno calculable)
+    filter(!is.na(retorno_diario)) 
+}
+```
+
+```{R get-data-stock-google}
+aapl <- tq_get("AAPL", get = "stock.prices", from = "2020-01-01")
+aapl
+```
+
+```{R usando-tibble}
+agregar_metricas_stocks_tibble <- function(tibble_data, 
+                                          col_precio = "close", 
+                                          col_volumen = "volume", 
+                                          n_periodos = 20) {
+  
+  # Verificar que el input sea un tibble
+  if (!tibble::is_tibble(tibble_data)) {
+    message("Convertiendo el dataframe a tibble...")
+    tibble_data <- tibble::as_tibble(tibble_data)
+  }
+  
+  # Verificar columnas requeridas
+  required_cols <- c(col_precio, col_volumen)
+  missing_cols <- setdiff(required_cols, names(tibble_data))
+  
+  if (length(missing_cols) > 0) {
+    stop(paste("El tibble debe contener las columnas:", 
+               paste(required_cols, collapse = ", "),
+               "\nFaltan:", paste(missing_cols, collapse = ", ")))
+  }
+  
+  # Calcular métricas
+  tibble_data %>%
+    dplyr::mutate(
+      # 1. Retorno diario (porcentaje)
+      retorno_diario = (!!rlang::sym(col_precio) / dplyr::lag(!!rlang::sym(col_precio)) - 1),
+      
+      # 2. Media móvil de precios (simple)
+      media_movil = zoo::rollmean(!!rlang::sym(col_precio), 
+                                 k = n_periodos, 
+                                 fill = NA, 
+                                 align = "right"),
+      
+      # 3. Volumen en millones
+      volumen_millones = !!rlang::sym(col_volumen) / 1e6,
+      
+      # 4. [Opcional] Volumen promedio móvil
+      volumen_media_movil = zoo::rollmean(!!rlang::sym(col_volumen),
+                                        k = n_periodos,
+                                        fill = NA,
+                                        align = "right") / 1e6,
+      
+      # Organizar columnas
+      .after = !!rlang::sym(col_volumen)
+    ) %>%
+    # Eliminar filas con NA (primera fila sin retorno calculable)
+    tidyr::drop_na(retorno_diario) %>%
+    # Añadir metadatos como atributos
+    tibble::new_tibble(., nrow = nrow(.), class = "tibble_metricas_stocks")
+}
+```
+
+
+
+```{R clean-stock}
+
+datos_stocks <- agregar_metricas_stocks(aapl, 
+                                       col_precio = "close", 
+                                       col_volumen = "volume",
+                                       n_periodos = 10)
+datos_stocks
+```
+
+
+
+```{R funciones-graficas}
+library(ggplot2)
+
+# Supongamos que ya tienes el tibble con métricas:
+# graficar el precio y su media móvil en el tiempo
+ggplot(
+  datos_stocks,
+  aes(x = date)) +
+  geom_line(aes(y = close, color = "Precio")) +
+  geom_line(aes(y = media_movil, color = "Media Móvil"), linewidth = 1) +
+  labs(
+    title = "Serie temporal de precios y media móvil",
+    x = "Fecha",
+    y = "Precio",
+    color = "Leyenda"
+  ) +
+  theme_minimal()
+
+```
+
+```{R}
+# incluir el volumen
+
+ggplot(
+  datos_stocks,
+  aes(x = date)) +
+  geom_col(aes(y = volumen_millones), fill = "grey80") +
+  geom_line(aes(y = close, color = "Precio"), linewidth = 1) +
+  geom_line(aes(y = media_movil, color = "Media Móvil"), linewidth = 1) +
+  scale_y_continuous(
+    name = "Precio",
+    sec.axis = sec_axis(~ ., name = "Volumen (millones)")
+  ) +
+  labs(
+    title = "Precio vs Volumen",
+    x = "Fecha",
+    color = "Variable"
+  ) +
+  theme_minimal()
+
+```
+
+
+```{R graficos-barra}
+datos_filtrados <- 
+  datos_stocks %>%
+  filter(date >= as.Date("2024-02-01") & date <= as.Date("2024-03-31"))
+
+# retorno diario como barras:
+ggplot(
+  datos_filtrados,
+  aes(x = date, y = retorno_diario)) +
+  geom_col(fill = "steelblue") +
+  labs(
+    title = "Retorno diario (%)",
+    x = "Fecha",
+    y = "Retorno"
+  ) +
+  theme_minimal()
+```

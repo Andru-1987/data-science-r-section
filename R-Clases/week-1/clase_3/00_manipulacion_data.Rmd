@@ -29,7 +29,6 @@ library(tidyverse)
 ```{R obtencion-data-from-url}
 url_path <- "https://gist.githubusercontent.com/rnirmal/e01acfdaf54a6f9b24e91ba4cae63518/raw/6b589a5c5a851711e20c5eb28f9d54742d1fe2dc/datasets.csv"
 data <- read.csv(url_path, sep = ",")
-
 glimpse(data)
 ```
 
@@ -775,6 +774,7 @@ detectar_outliers_mejorado <- function(x, factor = 1.5) {
   )
 }
 
+
 # Probar la función de limpieza
 df_prueba <- limpiar_dataset_empleados(df)
 cat("Resultado función de limpieza:", nrow(df_prueba), "filas\n")
@@ -794,9 +794,3 @@ La limpieza de datos es un proceso iterativo que requiere:
 - Verificación constante de la calidad de los datos
 
 Un dataset bien limpio es la base para análisis confiables y resultados reproducibles. El tiempo invertido en esta etapa se traduce en mayor precisión y confiabilidad en los análisis posteriores.
-
-```{R export-final}
-# Exportar dataset limpio final
-write.csv(df_final, "dataset_empleados_limpio.csv", row.names = FALSE)
-# cat("Dataset limpio exportado como: dataset_empleados_limpio.csv\n")
-```
