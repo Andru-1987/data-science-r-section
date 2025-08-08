@@ -1,0 +1,121 @@
+
+```{R install-dependencies}
+dependencies <- c("dplyr","stringr","readr","ggplot2","tidyr","purrr")
+missing_dependencies <- dependencies[ !dependencies %in% installed.packages()[,"Package"]] 
+lapply(missing_dependencies,install.packages)
+```
+
+```{R loading-libraries}
+library(dplyr)
+library(stringr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+library(purrr)
+```
+
+
+```{R}
+clientes_raw <- read_csv("https://raw.githubusercontent.com/Andru-1987/csv_files_ds/refs/heads/main/Customers.csv")
+str(clientes_raw)
+head(clientes_raw,10)
+```
+
+
+```{R}
+    reemplazar <- c(
+    "á|à|ä|â" = "a",
+    "é|è|ë|ê" = "e",
+    "í|ì|ï|î" = "i",
+    "ó|ò|ö|ô" = "o",
+    "ú|ù|ü|û" = "u",
+    "Á|À|Ä|Â" = "A",
+    "É|È|Ë|Ê" = "E",
+    "Í|Ì|Ï|Î" = "I",
+    "Ó|Ò|Ö|Ô" = "O",
+    "Ú|Ù|Ü|Û" = "U",
+    "ñ" = "n",
+    "Ñ" = "N")
+
+
+    normalizacion_texto <- function(texto_generico){
+        indices <- names(reemplazar) 
+        purrr::reduce(
+            indices,
+            ~ str_replace_all(.x, .y, reemplazar[[.y]]),
+            .init = texto_generico
+        )
+    }
+
+
+    normalizacion_texto_for <- function(texto_generico){
+        for( pattern in names(reemplazar)){
+            texto_generico <- str_replace_all(texto_generico, pattern, reemplazar[[pattern]])
+        }
+
+        texto_generico
+    }
+
+
+
+    clientes_clean <- clientes_raw %>%
+        mutate(
+            across(
+                where(is.character), 
+                ~ .x %>%
+                as.character() %>%
+                normalizacion_texto %>%
+                str_replace_all("[^a-zA-Z0-9\\s\\-\\.]","")
+            )
+        )
+
+    clientes_clean <- 
+        clientes_clean %>%
+        mutate(
+            Country = toupper(Country),
+            Edad = sample(
+                19:99, n(), replace=TRUE, prob=dnorm(19:99, mean = 42, sd = 12 )
+            ) 
+        )
+
+    head(clientes_clean)
+
+
+    tabla_sum <- 
+        clientes_clean %>%
+        group_by(Country) %>%
+        summarize(
+            total_clientes = n_distinct((ContactName), na.rm = TRUE ),
+            ciudades_unicas = n_distinct((City), na.rm = TRUE ),
+            .groups = 'drop') %>% 
+        arrange(desc(total_clientes))
+
+    print(tabla_sum, n = 20)
+
+
+    stats <- clientes_clean %>%
+    summarize(
+        edad_min  = min(Edad),
+        edad_max = max(Edad),
+        edad_avg = mean(Edad),
+        edad_median = median(Edad)
+    )
+
+    print(stats)
+    summary(clientes_clean)
+
+
+    # ggplot(clientes_clean, aes(x = Edad)) + 
+    # geom_histogram( binwidth = 10, fill="coral", color="black") +
+    # labs(title="Distribucion de edades", x= "Edades", y="Q") +
+    # theme_classic()
+
+
+
+    ggplot(tabla_sum, aes(x= reorder(Country, total_clientes),y= total_clientes)) +
+        geom_bar(stat = "identity", fill="steelblue") + 
+        coord_flip() +
+        geom_text(aes(label=total_clientes), hjust= -0.1, size=8)+
+        labs("Clientes por pais", x="Paises", y="Q de clientes") +
+        theme_minimal()
+```

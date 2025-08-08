@@ -1,0 +1,121 @@
+## Ejercicio 1: Limpieza Básica de Datos
+
+**Enunciado:**
+Crea un dataframe con los siguientes datos problemáticos y aplica estas operaciones:
+1. Elimina filas duplicadas
+2. Reemplaza los valores NA en la columna "Edad" con la mediana
+3. Convierte la columna "Nombre" a formato título (primera letra mayúscula)
+4. Elimina espacios en blanco al inicio/final en "Ciudad"
+
+```{R}
+# Datos iniciales
+datos <- data.frame(
+  ID = c(1, 2, 2, 3, 4, 5, 5),
+  Nombre = c(" juan", "maría", "maría", " pedro", "ANA ", "luis", "luis"),
+  Edad = c(25, NA, 30, NA, 35, 40, 40),
+  Ciudad = c("Madrid ", " Barcelona", "Barcelona", "Sevilla", "Valencia", "Bilbao ", "Bilbao ")
+)
+```
+
+**Solución propuesta:**
+
+```{R}
+library(dplyr)
+library(stringr)
+
+# Limpieza
+datos_limpios <- datos %>%
+  distinct() %>%  # 1. Elimina duplicados
+  mutate(
+    Edad = ifelse(is.na(Edad), median(Edad, na.rm = TRUE), Edad),  # 2. Reemplaza NA con mediana
+    Nombre = str_to_title(trimws(Nombre)),  # 3. Formato título
+    Ciudad = trimws(Ciudad)  # 4. Elimina espacios
+  )
+
+print(datos_limpios)
+```
+
+## Ejercicio 2: Manejo de Valores Atípicos y Datos Categóricos
+
+**Enunciado:**
+Dado el siguiente dataframe:
+1. Identifica y trata los outliers en "Precio" (reemplázalos con el percentil 95)
+2. Aplica label encoding a la columna "Categoría"
+3. Crea variables dummy para "Tipo"
+
+```{R}
+productos <- data.frame(
+  ID = 1:10,
+  Producto = c("A", "B", "C", "D", "E", "F", "G", "H", "I", "J"),
+  Precio = c(100, 150, 200, 250, 300, 350, 400, 450, 5000, 5500),
+  Categoria = c("Alto", "Medio", "Bajo", "Alto", "Medio", "Bajo", "Alto", "Medio", "Bajo", "Alto"),
+  Tipo = c("Electrónico", "Hogar", "Electrónico", "Ropa", "Hogar", "Ropa", "Electrónico", "Hogar", "Ropa", "Electrónico")
+)
+```
+
+**Solución propuesta:**
+
+```{R}
+library(DescTools)
+
+# 1. Tratamiento de outliers
+percentil_95 <- quantile(productos$Precio, 0.95)
+productos$Precio <- ifelse(productos$Precio > percentil_95, percentil_95, productos$Precio)
+
+# 2. Label encoding
+productos$Categoria_encoded <- as.numeric(factor(productos$Categoria, 
+                                               levels = c("Bajo", "Medio", "Alto")))
+
+# 3. Variables dummy
+library(fastDummies)
+productos <- dummy_cols(productos, select_columns = "Tipo", remove_selected_columns = FALSE)
+
+print(productos)
+```
+
+## Ejercicio 3: Limpieza de Texto y Fechas
+
+**Enunciado:**
+Para el siguiente dataframe:
+1. Estandariza el formato de fechas (algunas están como "dd-mm-aaaa" y otras como "aaaa-mm-dd")
+2. Extrae el dominio de los emails
+3. Separa "Nombre_Completo" en dos columnas: "Nombre" y "Apellido"
+4. Convierte "Puntuación" a numérico (elimina el símbolo %)
+
+```{R}
+clientes <- data.frame(
+  ID = 1:5,
+  Nombre_Completo = c("Juan Pérez", "María García", "Carlos López", "Ana Martínez", "Luisa Rodríguez"),
+  Email = c("juan@correo.com", "maria.g@empresa.org", "carlos@servicio.net", "ana@correo.com", "luisa.r@empresa.org"),
+  Fecha_Registro = c("15-01-2023", "2023-02-20", "10-03-2023", "2023-04-05", "25-05-2023"),
+  Puntuacion = c("85%", "90%", "78%", "92%", "88%")
+)
+```
+
+**Solución propuesta:**
+
+```{R}
+library(tidyr)
+library(stringr)
+
+clientes_limpios <- clientes %>%
+  mutate(
+    # 1. Estandarizar fechas
+    Fecha_Registro = ifelse(grepl("-", Fecha_Registro),
+                           as.Date(Fecha_Registro, format = "%d-%m-%Y"),
+                           as.Date(Fecha_Registro)),
+    
+    # 2. Extraer dominio de email
+    Dominio_Email = str_extract(Email, "@\\w+.\\w+"),
+    
+    # 3. Separar nombre completo
+    Nombre = str_split(Nombre_Completo, " ", simplify = TRUE)[,1],
+    Apellido = str_split(Nombre_Completo, " ", simplify = TRUE)[,2],
+    
+    # 4. Convertir puntuación
+    Puntuacion = as.numeric(str_replace(Puntuacion, "%", ""))
+  ) %>%
+  select(-Nombre_Completo)  # Eliminar columna original
+
+print(clientes_limpios)
+```
