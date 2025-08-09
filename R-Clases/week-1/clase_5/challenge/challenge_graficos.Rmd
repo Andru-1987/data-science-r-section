@@ -1,0 +1,192 @@
+# Realizar graficos con ggplot2
+
+```{R dependencies-import}
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(tidyverse)
+```
+
+# **Desafíos ggplot2 - Dataset Heart Disease**
+```{R data-loading}
+
+uri_path_csv <- "https://raw.githubusercontent.com/niaj-a/Machine-Learning/refs/heads/master/10.classification-metrics/heart.csv"
+
+data <- read.csv(
+  uri_path_csv, sep=","
+)
+
+head(data)
+summary(data)
+glimpse(data)
+```
+
+```{R limpieza-dataset-labeling}
+# Convertir variables categóricas
+data$target <- factor(data$target, levels = c(0, 1), labels = c("No Disease", "Disease"))
+data$sex <- factor(data$sex, levels = c(0, 1), labels = c("Female", "Male"))
+data$cp <- factor(data$cp, levels = c(0, 1, 2, 3), 
+                  labels = c("Typical Angina", "Atypical Angina", "Non-anginal", "Asymptomatic"))
+data$fbs <- factor(data$fbs, levels = c(0, 1), labels = c("<=120 mg/dl", ">120 mg/dl"))
+
+
+```
+
+---
+
+## **🎯 NIVEL BÁSICO - Gráficos Fundamentales**
+
+### **Challenge 1: Scatter Plot Médico**
+**Consigna**: Crea un gráfico de dispersión que muestre la relación entre edad y colesterol, diferenciando por diagnóstico de enfermedad cardíaca.
+- Usar puntos de tamaño 3 con transparencia 0.7
+- Agregar títulos descriptivos en español
+- Aplicar tema minimalista
+
+### **Challenge 2: Análisis de Presión Arterial**
+**Consigna**: Diseña un scatter plot que relacione presión arterial en reposo con frecuencia cardíaca máxima, coloreando por sexo.
+- Usar puntos de tamaño 2.5 con transparencia 0.8
+- Incluir etiquetas descriptivas para los ejes
+
+### **Challenge 3: Distribución por Género**
+**Consigna**: Construye un histograma que muestre la distribución de edad por sexo.
+- Usar ancho de bins = 2
+- Aplicar posición "identity" con transparencia 0.6
+- Usar tema clásico
+
+### **Challenge 4: Análisis de Colesterol**
+**Consigna**: Crea un histograma de la distribución del colesterol por diagnóstico.
+- Usar ancho de bins = 15
+- Aplicar posición "dodge" con transparencia 0.7
+
+### **Challenge 5: Dolor en el Pecho - Boxplot**
+**Consigna**: Desarrolla un boxplot que muestre la frecuencia cardíaca máxima por tipo de dolor en el pecho.
+- Rellenar por tipo de dolor con transparencia 0.8
+- Rotar etiquetas del eje X a 45 grados
+- Usar tema minimalista
+
+### **Challenge 6: Comparación Demográfica**
+**Consigna**: Construye un boxplot de edad por diagnóstico y sexo.
+- Usar posición "dodge" para separar por sexo
+- Incluir títulos descriptivos
+
+### **Challenge 7: Conteo de Pacientes**
+**Consigna**: Diseña un gráfico de barras que muestre el conteo de pacientes por tipo de dolor en el pecho, diferenciando por diagnóstico.
+- Usar posición "dodge"
+- Aplicar tema light
+- Rotar etiquetas del eje X
+
+### **Challenge 8: Densidad del Colesterol**
+**Consigna**: Crea un gráfico de densidad del colesterol por diagnóstico.
+- Usar transparencia 0.5
+- Aplicar tema minimalista
+
+---
+
+## **🚀 NIVEL INTERMEDIO - Personalización y Estilos**
+
+### **Challenge 9: Tema Oscuro Personalizado**
+**Consigna**: Crea un scatter plot de edad vs frecuencia cardíaca con tema oscuro personalizado.
+- Usar tema oscuro como base
+- Personalizar colores: título en blanco y negrita, ejes en azul claro
+- Personalizar leyenda en blanco
+- Puntos de tamaño 3 con transparencia 0.7
+
+### **Challenge 10: Facetas por Sexo**
+**Consigna**: Desarrolla gráficos separados por sexo mostrando edad vs colesterol.
+- Usar facetas libres (`scales = "free"`)
+- Colorear por diagnóstico con transparencia 0.7
+- Aplicar tema blanco y negro
+
+### **Challenge 11: Grid de Facetas Complejo**
+**Consigna**: Construye un grid de facetas mostrando edad vs frecuencia cardíaca por sexo y diagnóstico.
+- Usar `facet_grid(sex ~ target)`
+- Colorear puntos por tipo de dolor
+- Aplicar transparencia 0.7
+
+### **Challenge 12: Colores Manuales Avanzados**
+**Consigna**: Crea un gráfico de violín de frecuencia cardíaca por tipo de dolor con colores personalizados.
+- Asignar colores específicos:
+  - "Typical Angina" = "#FF6B6B"
+  - "Atypical Angina" = "#4ECDC4"
+  - "Non-anginal" = "#45B7D1"
+  - "Asymptomatic" = "#96CEB4"
+- Usar transparencia 0.8
+- Rotar etiquetas del eje X
+
+---
+
+## **🔥 NIVEL AVANZADO - Visualizaciones Complejas**
+
+### **Challenge 13: Densidad 2D**
+**Consigna**: Desarrolla un gráfico de densidad 2D de edad vs colesterol.
+- Usar `geom_density_2d_filled()` con transparencia 0.7
+- Superponer puntos coloreados por diagnóstico
+- Puntos pequeños (tamaño 1) con transparencia 0.5
+- Aplicar `theme_void()`
+
+### **Challenge 14: Matriz de Correlación (Heatmap)**
+**Consigna**: Construye un heatmap de correlación para variables numéricas.
+- Seleccionar variables: age, trestbps, chol, thalach, oldpeak, ca, thal
+- Usar tidyverse para transformar la matriz (`pivot_longer`)
+- Aplicar gradiente de colores: azul-blanco-rojo
+- Incluir valores de correlación como texto
+- Rotar etiquetas del eje X
+
+### **Challenge 15: Violín + Boxplot Combinado**
+**Consigna**: Crea un gráfico de violín con boxplot interno mostrando distribución de edad por diagnóstico.
+- Violín con transparencia 0.7
+- Boxplot interno de ancho 0.1, relleno blanco con transparencia 0.8
+- Usar paleta de colores "Set2"
+
+### **Challenge 16: Gráfico Interactivo**
+**Consigna**: Desarrolla un gráfico interactivo de edad vs frecuencia cardíaca.
+- Incluir información en tooltip: Edad, Frecuencia Cardíaca, Sexo, Diagnóstico
+- Usar plotly para convertir a interactivo
+- Puntos de tamaño 2 con transparencia 0.7
+
+---
+
+## **💡 NIVEL EXPERTO - Análisis Médico Especializado**
+
+### **Challenge 17: Análisis Multifactorial**
+**Consigna**: Crea un análisis de factores de riesgo múltiples.
+- Histograma de edad con relleno por diagnóstico
+- Usar facetas en grid por sexo y nivel de glucosa (`facet_grid(sex ~ fbs)`)
+- Incluir etiquetas automáticas con `labeller = label_both`
+- 15 bins con transparencia 0.7
+
+### **Challenge 18: Perfil de Pacientes Avanzado**
+**Consigna**: Desarrolla un análisis de perfil de pacientes por tipo de dolor.
+- Crear resumen agrupado por tipo de dolor y diagnóstico
+- Calcular promedios de edad, colesterol y frecuencia cardíaca
+- Incluir conteo de pacientes
+- Gráfico de puntos con tamaño proporcional al número de pacientes
+- Usar transparencia 0.8
+
+### **Challenge 19: Análisis de Distribuciones por Facetas**
+**Consigna**: Construye un histograma del colesterol dividido por sexo usando facetas.
+- Ancho de bins = 20
+- Transparencia 0.7
+- Colorear por diagnóstico
+- Usar `facet_wrap(~sex)`
+
+### **Challenge 20: Análisis Multivariable Complejo**
+**Consigna**: Crea un scatter plot multivariable de depresión ST vs frecuencia cardíaca.
+- Colorear por tipo de dolor en el pecho
+- Usar facetas por diagnóstico (`facet_wrap(~target)`)
+- Puntos de tamaño 2 con transparencia 0.7
+- Variables: oldpeak (eje X) vs thalach (eje Y)
+
+### **Challenge 21: Personalización Extrema**
+**Consigna**: Diseña un boxplot totalmente personalizado de presión arterial por diagnóstico.
+- Tema oscuro como base
+- Colores manuales específicos:
+  - "No Disease" = "#2ECC71" (verde)
+  - "Disease" = "#E74C3C" (rojo)
+- Transparencia 0.8
+- Título centrado, en negrita, tamaño 16
+- Texto de ejes en gris claro
+- Ocultar leyenda
+- Variable: trestbps (presión arterial en reposo)
+
+---

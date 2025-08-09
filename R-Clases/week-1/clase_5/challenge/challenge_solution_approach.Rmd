@@ -1,0 +1,338 @@
+
+```{R dependencies-import}
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(tidyverse)
+```
+
+# **Desafíos ggplot2 - Dataset Heart Disease**
+```{R data-loading}
+
+uri_path_csv <- "https://raw.githubusercontent.com/niaj-a/Machine-Learning/refs/heads/master/10.classification-metrics/heart.csv"
+
+data <- read.csv(
+  uri_path_csv, sep=","
+)
+
+head(data)
+summary(data)
+glimpse(data)
+```
+
+```{R limpieza-dataset-labeling}
+# Convertir variables categóricas
+data$target <- factor(data$target, levels = c(0, 1), labels = c("No Disease", "Disease"))
+data$sex <- factor(data$sex, levels = c(0, 1), labels = c("Female", "Male"))
+data$cp <- factor(data$cp, levels = c(0, 1, 2, 3), 
+                  labels = c("Typical Angina", "Atypical Angina", "Non-anginal", "Asymptomatic"))
+data$fbs <- factor(data$fbs, levels = c(0, 1), labels = c("<=120 mg/dl", ">120 mg/dl"))
+```
+
+
+---
+
+### **Challenge 1: Scatter Plot Médico**
+```{R solution-1}
+ggplot(data, aes(x = age, y = chol, color = target)) +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(title = "Edad vs Colesterol por Enfermedad Cardíaca", 
+       x = "Edad (años)", 
+       y = "Colesterol (mg/dl)",
+       color = "Diagnóstico") +
+  theme_minimal()
+```
+
+### **Challenge 2: Análisis de Presión Arterial**
+```{R solution-2}
+ggplot(data, aes(x = trestbps, y = thalach, color = sex)) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  labs(title = "Presión Arterial vs Frecuencia Cardíaca Máxima", 
+       x = "Presión Arterial en Reposo (mm Hg)", 
+       y = "Frecuencia Cardíaca Máxima",
+       color = "Sexo")
+```
+
+### **Challenge 3: Distribución por Género**
+```{R solution-3}
+ggplot(data, aes(x = age, fill = sex)) +
+  geom_histogram(binwidth = 2, position = "identity", alpha = 0.6) +
+  labs(title = "Distribución de Edad por Sexo",
+       x = "Edad (años)",
+       y = "Frecuencia",
+       fill = "Sexo") +
+  theme_classic()
+```
+
+### **Challenge 4: Análisis de Colesterol**
+```{R solution-4}
+ggplot(data, aes(x = chol, fill = target)) +
+  geom_histogram(binwidth = 15, position = "dodge", alpha = 0.7) +
+  labs(title = "Distribución del Colesterol por Diagnóstico",
+       x = "Colesterol (mg/dl)",
+       y = "Frecuencia",
+       fill = "Diagnóstico")
+```
+
+### **Challenge 5: Dolor en el Pecho - Boxplot**
+```{R solution-5}
+ggplot(data, aes(x = cp, y = thalach, fill = cp)) +
+  geom_boxplot(alpha = 0.8) +
+  labs(title = "Frecuencia Cardíaca Máxima por Tipo de Dolor en el Pecho",
+       x = "Tipo de Dolor en el Pecho",
+       y = "Frecuencia Cardíaca Máxima",
+       fill = "Tipo de Dolor") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### **Challenge 6: Comparación Demográfica**
+```{R solution-6}
+ggplot(data, aes(x = target, y = age, fill = sex)) +
+  geom_boxplot(position = "dodge") +
+  labs(title = "Distribución de Edad por Diagnóstico y Sexo",
+       x = "Diagnóstico",
+       y = "Edad (años)",
+       fill = "Sexo")
+```
+
+### **Challenge 7: Conteo de Pacientes**
+```{R solution-7}
+ggplot(data, aes(x = cp, fill = target)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribución de Pacientes por Tipo de Dolor en el Pecho",
+       x = "Tipo de Dolor en el Pecho",
+       y = "Número de Pacientes",
+       fill = "Diagnóstico") +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### **Challenge 8: Densidad del Colesterol**
+```{R solution-8}
+ggplot(data, aes(x = chol, fill = target)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Distribución de Densidad del Colesterol",
+       x = "Colesterol (mg/dl)",
+       y = "Densidad",
+       fill = "Diagnóstico") +
+  theme_minimal()
+```
+
+---
+
+## **🚀 NIVEL INTERMEDIO - Soluciones**
+
+### **Challenge 9: Tema Oscuro Personalizado**
+```{R solution-9}
+ggplot(data, aes(x = age, y = thalach, color = target)) +
+  geom_point(size = 3, alpha = 0.7) +
+  theme_dark() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold", color = "white"),
+    axis.text = element_text(color = "lightblue"),
+    legend.title = element_text(color = "white"),
+    legend.text = element_text(color = "white")
+  ) +
+  labs(title = "Edad vs Frecuencia Cardíaca (Tema Oscuro)",
+       x = "Edad (años)",
+       y = "Frecuencia Cardíaca Máxima",
+       color = "Diagnóstico")
+```
+
+### **Challenge 10: Facetas por Sexo**
+```{R solution-10}
+ggplot(data, aes(x = age, y = chol, color = target)) +
+  geom_point(alpha = 0.7) +
+  facet_wrap(~sex, scales = "free") +
+  labs(title = "Edad vs Colesterol por Sexo",
+       x = "Edad (años)",
+       y = "Colesterol (mg/dl)",
+       color = "Diagnóstico") +
+  theme_dark()
+```
+
+### **Challenge 11: Grid de Facetas Complejo**
+```{R solution-11}
+ggplot(data, aes(x = age, y = thalach)) +
+  geom_point(aes(color = cp), alpha = 0.7) +
+  facet_grid(sex ~ target) +
+  labs(title = "Edad vs Frecuencia Cardíaca por Sexo y Diagnóstico",
+       x = "Edad (años)",
+       y = "Frecuencia Cardíaca Máxima",
+       color = "Tipo de Dolor") +
+  theme_minimal()
+```
+
+### **Challenge 12: Colores Manuales Avanzados**
+```{R solution-12}
+ggplot(data, aes(x = cp, y = thalach, fill = cp)) +
+  geom_violin(alpha = 0.8) +
+  scale_fill_manual(values = c("Typical Angina" = "#FF6B6B", 
+                               "Atypical Angina" = "#4ECDC4", 
+                               "Non-anginal" = "#45B7D1", 
+                               "Asymptomatic" = "#96CEB4")) +
+  labs(title = "Distribución de Frecuencia Cardíaca por Tipo de Dolor",
+       x = "Tipo de Dolor en el Pecho",
+       y = "Frecuencia Cardíaca Máxima",
+       fill = "Tipo de Dolor") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+---
+
+## **🔥 NIVEL AVANZADO - Soluciones**
+
+### **Challenge 13: Densidad 2D**
+```{R solution-13}
+ggplot(data, aes(x = age, y = chol)) +
+  geom_density_2d_filled(alpha = 0.7) +
+  geom_point(aes(color = target), size = 1, alpha = 0.5) +
+  labs(title = "Densidad 2D: Edad vs Colesterol",
+       x = "Edad (años)",
+       y = "Colesterol (mg/dl)") +
+  theme_void()
+```
+
+### **Challenge 14: Matriz de Correlación (Heatmap)**
+```{R solution-14}
+# Seleccionar variables numéricas
+numeric_vars <- data %>% 
+  select(age, trestbps, chol, thalach, oldpeak, ca, thal)
+
+# Calcular matriz de correlación
+cor_matrix <- cor(numeric_vars, use = "complete.obs")
+
+# Transformar usando tidyverse
+cor_matrix_long <- cor_matrix %>%
+  as.data.frame() %>%
+  mutate(Variable1 = rownames(cor_matrix)) %>%
+  pivot_longer(cols = -Variable1, names_to = "Variable2", values_to = "Correlation")
+
+# Crear heatmap
+ggplot(cor_matrix_long, aes(x = Variable1, y = Variable2, fill = Correlation)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1, 1)) +
+  geom_text(aes(label = round(Correlation, 2)), color = "black", size = 3) +
+  labs(title = "Matriz de Correlación - Variables Cardíacas",
+       x = "", y = "", fill = "Correlación") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### **Challenge 15: Violín + Boxplot Combinado**
+```{R solution-15}
+ggplot(data, aes(x = target, y = age, fill = target)) +
+  geom_violin(alpha = 0.7) +
+  geom_boxplot(width = 0.1, fill = "white", alpha = 0.8) +
+  labs(title = "Distribución de Edad por Diagnóstico",
+       x = "Diagnóstico",
+       y = "Edad (años)",
+       fill = "Diagnóstico") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set2")
+```
+
+### **Challenge 16: Gráfico Interactivo**
+```{R solution-16}
+# Crear gráfico base
+p <- ggplot(data, aes(x = age, y = thalach, color = target, 
+                      text = paste("Edad:", age, 
+                                  "<br>Freq. Cardíaca:", thalach,
+                                  "<br>Sexo:", sex,
+                                  "<br>Diagnóstico:", target))) +
+  geom_point(size = 2, alpha = 0.7) +
+  labs(title = "Edad vs Frecuencia Cardíaca (Interactivo)",
+       x = "Edad (años)",
+       y = "Frecuencia Cardíaca Máxima",
+       color = "Diagnóstico") +
+  theme_minimal()
+
+# Convertir a interactivo
+ggplotly(p, tooltip = "text")
+```
+
+---
+
+## **💡 NIVEL EXPERTO - Soluciones**
+
+### **Challenge 17: Análisis Multifactorial**
+```{R solution-17}
+ggplot(data, aes(x = age)) +
+  geom_histogram(aes(fill = target), alpha = 0.7, bins = 15) +
+  facet_grid(sex ~ fbs, labeller = label_both) +
+  labs(title = "Distribución de Edad por Sexo y Nivel de Glucosa",
+       subtitle = "Separado por diagnóstico de enfermedad cardíaca",
+       x = "Edad (años)",
+       y = "Número de pacientes",
+       fill = "Diagnóstico") +
+  theme_bw()
+```
+
+### **Challenge 18: Perfil de Pacientes Avanzado**
+```{R solution-18}
+# Crear un resumen por tipo de dolor
+pain_summary <- data %>%
+  group_by(cp, target) %>%
+  summarise(
+    mean_age = mean(age, na.rm = TRUE),
+    mean_chol = mean(chol, na.rm = TRUE),
+    mean_thalach = mean(thalach, na.rm = TRUE),
+    count = n(),
+    .groups = 'drop'
+  )
+
+# Gráfico de perfil
+ggplot(pain_summary, aes(x = cp, y = mean_age, size = count, color = target)) +
+  geom_point(alpha = 0.8) +
+  labs(title = "Perfil de Pacientes por Tipo de Dolor en el Pecho",
+       x = "Tipo de Dolor",
+       y = "Edad Promedio (años)",
+       size = "Número de Pacientes",
+       color = "Diagnóstico") +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### **Challenge 19: Análisis de Distribuciones por Facetas**
+```{R solution-19}
+ggplot(data, aes(x = chol, fill = target)) +
+  geom_histogram(binwidth = 20, alpha = 0.7) +
+  facet_wrap(~sex) +
+  labs(title = "Distribución del Colesterol por Sexo",
+       x = "Colesterol (mg/dl)",
+       y = "Frecuencia",
+       fill = "Diagnóstico")
+```
+
+### **Challenge 20: Análisis Multivariable Complejo**
+```{R solution-20}
+ggplot(data, aes(x = oldpeak, y = thalach, color = cp)) +
+  geom_point(size = 2, alpha = 0.7) +
+  facet_wrap(~target) +
+  labs(title = "Depresión ST vs Frecuencia Cardíaca por Tipo de Dolor",
+       x = "Depresión ST (oldpeak)",
+       y = "Frecuencia Cardíaca Máxima",
+       color = "Tipo de Dolor") +
+  theme_dark()
+```
+
+### **Challenge 21: Personalización Extrema**
+```{R solution-21}
+ggplot(data, aes(x = target, y = trestbps, fill = target)) +
+  geom_boxplot(alpha = 0.8) +
+  scale_fill_manual(values = c("No Disease" = "#2ECC71", "Disease" = "#E74C3C")) +
+  theme_dark() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    axis.text = element_text(color = "lightgray"),
+    legend.position = "none"
+  ) +
+  labs(title = "Presión Arterial por Diagnóstico",
+       x = "Diagnóstico",
+       y = "Presión Arterial en Reposo (mm Hg)")
+```
+
+

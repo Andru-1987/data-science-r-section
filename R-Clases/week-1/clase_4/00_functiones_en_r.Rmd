@@ -17,10 +17,6 @@ fontsize: 10pt
 geometry: margin=1in
 ---
 
-Perfecto, acá tenés el contenido de la clase sin emojis, con una estructura clara para estudiantes de Data Science que ya manejan Python:
-
----
-
 ## Clase: Funciones y Funciones Lambda en R
 
 ### Objetivo de la clase
