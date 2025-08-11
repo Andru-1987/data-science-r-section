@@ -87,6 +87,38 @@ df %>%
   mutate(valor_cuadrado = sapply(valor, function(x) x^2))
 ```
 
+```{R function-mutation}
+
+mutation_function <- function(df){
+  df <- df %>% 
+  
+  mutate(segmentacion = case_when(
+    edad <= 29 ~ "segmento_cero",
+    edad > 29 & edad <=40 ~ "segmento_uno",
+    edad > 40 & edad <=70 ~ "segmento_dos",
+    edad > 70 ~ "segmento_tres",
+    TRUE ~ NA_character_
+  )
+  ) %>% 
+  mutate(segmentacion = factor(x = segmentacion, levels = c("segmento_cero","segmento_uno","segmento_dos","segmento_tres"), exclude = TRUE)) %>%
+  arrange(segmentacion)
+  
+  return(df)
+}
+
+```
+
+```{R usage-purrr-pack}
+
+library(dplyr)
+library(purrr)
+
+data.frame(edad = sample(29:79, 20)) %>%
+mutation_function() -> dataframe_segmentado
+
+dataframe_segmentado
+```
+
 ---
 
 ## Ejercicios simples para *clase*
@@ -110,7 +142,7 @@ edades <- c(12, 20, 35, 7, 65)
 ```{R}
 library(purrr)
 
-map(1:5, ~ .x^2)
+map(1:5, ~ edad^2)
 ```
 
 ---

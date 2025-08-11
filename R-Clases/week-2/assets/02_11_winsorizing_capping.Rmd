@@ -1,0 +1,122 @@
+## **1. Qué es Winsorizing**
+
+**Winsorizing** es una técnica para tratar *outliers* (valores extremos) **recortando** los valores muy altos o muy bajos hacia un límite específico, pero **sin eliminarlos**.
+En lugar de quitar esas observaciones, las reemplazas por el valor del percentil que definas.
+
+**Ejemplo simple**
+
+* Tienes un conjunto de ingresos anuales en USD:
+  `[25k, 30k, 32k, 35k, 36k, 37k, 40k, 2M]`
+* El valor `2M` es un *outlier*.
+* Si aplicas **winsorizing** al 95% superior:
+
+  * Todos los valores por encima del percentil 95 se reemplazan **por el valor del percentil 95**.
+  * Resultado: `[25k, 30k, 32k, 35k, 36k, 37k, 40k, 40k]`.
+
+Ventajas:
+
+* Mantienes el número de filas original.
+* Reduce la influencia de valores extremos sin distorsionar tanto la distribución.
+
+---
+
+## **2. Capping tradicional**
+
+El **capping** (a veces llamado *trimming*) también pone límites a los datos, pero no necesariamente usa percentiles. Puede ser:
+
+* **Basado en reglas fijas**: "Todo valor mayor a 1000 será reemplazado por 1000".
+* **Basado en estadística**: "Todo valor mayor a `media + 3*desviación estándar` se recorta".
+
+**Ejemplo**
+
+* `[25k, 30k, 32k, 35k, 36k, 37k, 40k, 2M]`
+* Capping superior en `100k`:
+
+  * `[25k, 30k, 32k, 35k, 36k, 37k, 40k, 100k]`.
+
+---
+
+## **3. Diferencias clave**
+
+| Aspecto                       | Winsorizing                                                                     | Capping tradicional                                      |
+| ----------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **Cómo define el límite**     | Percentiles (ej. 5% y 95%)                                                      | Valores fijos o fórmula (media ± n\*std)                 |
+| **Efecto en la distribución** | Mantiene forma más suave, recorta menos abrupto                                 | Puede distorsionar más si el límite no está bien elegido |
+| **Uso típico**                | Estudios estadísticos, modelos donde la distribución importa (regresión, ANOVA) | Casos prácticos donde hay umbral lógico (ej. edad ≤ 120) |
+| **Sensibilidad a la escala**  | Percentiles son independientes de la escala                                     | Puede requerir normalización previa                      |
+
+---
+
+**Regla rápida para decidir**:
+
+* **Winsorizing** → Cuando quieres suavizar la influencia de outliers pero preservar la distribución lo más fiel posible.
+* **Capping tradicional** → Cuando tienes límites lógicos o de negocio claros (edad, notas, límites físicos).
+
+```{R install-package}
+packs <- installed.packages()[,"Package"]
+to_install <- c("tidyr")
+ready_to_install <- to_install[!to_install %in% packs ]
+
+ifelse(ready_to_install, lapply(ready_to_install,install.packages), NA)
+
+```
+
+```{R simple-dataset}
+set.seed(42)
+data<-data.frame( valor=c(rnorm(100,mean=75,sd=5), 250,260,270))
+
+summary(data$valor)
+```
+
+```{R function-winsorize}
+winsorize_custom <- function(x, lower = 0.01, upper = 0.99) {
+  lower_bound <- quantile(x, lower)
+  upper_bound <- quantile(x, upper)
+  pmin(pmax(x, lower_bound), upper_bound)
+}
+```
+
+
+```{R ejemplo-con-capping}
+library(dplyr)
+
+lower_cap <- quantile(data$valor,0.01)
+upper_cap <- quantile(data$valor,0.99)
+
+data <- data %>%
+  mutate(
+    capping = case_when(
+      valor < lower_cap ~ lower_cap,
+      valor > upper_cap ~ upper_cap,
+      TRUE ~ valor
+    ),
+    metodo_capping_between=between(valor,lower_cap,upper_cap),
+    winsorize=winsorize_custom(valor),
+    metodo_winsorize_between=winsorize == valor
+  )
+head(data)
+```
+
+
+```{R comparacion-visual}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+# data_long <- data %>%
+#   select(valor,capping,winsorize) %>%
+#   pivot_longer(cols=everything(),names_to="Metodo",values_to="Valor")
+
+data_long <- data %>%
+  select(valor,capping,winsorize) %>%
+  gather(key="Metodo",value="Valor")
+
+ggplot(
+  data=data_long,
+  aes(x=Metodo,y=Valor,fill=Metodo)
+)+
+geom_violin(alpha=0.5,color=NA)+
+geom_boxplot(width=0.1,outlier.color="red",outlier.shape=16) +
+theme_minimal()+
+labs(title="Comparacion de distribucion: Original vs Capping vs Winsorizing")
+```

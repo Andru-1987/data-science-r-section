@@ -1,53 +1,76 @@
-# Proyecto de ML en R: Regresión logística sobre dataset del corazón
-# Fuente de datos:
-# https://raw.githubusercontent.com/niaj-a/Machine-Learning/refs/heads/master/10.classification-metrics/heart.csv
+# Proyecto de ML en R: Regresión logística 
 
-# Objetivo: Clasificar si un paciente tiene enfermedad cardiaca (target: target)
+- [Fuente de datos:](https://raw.githubusercontent.com/niaj-a/Machine-Learning/refs/heads/master/10.classification-metrics/heart.csv)
+
+## Objetivo: Clasificar si un paciente tiene enfermedad cardiaca (target: target)
 
 # Requisitos: instalar los paquetes necesarios si no están instalados
+```{R instalar-packages-necesarios}
 required_pkgs <- c('tidyverse', 'tidymodels', 'GGally', 'corrplot', 'vip', 'ranger', 'xgboost', 'glmnet')
 new_pkgs <- required_pkgs[!(required_pkgs %in% installed.packages()[, 'Package'])]
 if(length(new_pkgs)) install.packages(new_pkgs)
+```
 
+```{R importacion-librerias}
 library(tidyverse)
 library(tidymodels)
-library(GGally)
+library(GGally) # es como una dependecias simil a ggplot
 library(corrplot)
-library(vip)
+library(vip) # variable importance plot
 
 set.seed(123)
+```
 
-# 1) Cargar datos
+
+### Cargar datos
+```{R data-loading}
 url <- 'https://raw.githubusercontent.com/niaj-a/Machine-Learning/refs/heads/master/10.classification-metrics/heart.csv'
 heart <- read_csv(url)
 
 # Resumen rápido
 glimpse(heart)
 summary(heart)
+```
 
-# 2) EDA
-#  - Conteo de la variable objetivo
-heart %>% count(target) %>% mutate(freq = n / sum(n))
+###  EDA
+  *Conteo de la variable objetivo*
+```{R eda-historico-analitico}
+
+heart %>% 
+  count(target) %>% 
+  mutate(freq = n / sum(n))
 
 #  - Distribuciones de algunas variables contínuas
-heart %>% select(age, trestbps, chol, thalach) %>% gather() %>%
+heart %>% 
+  select(age, trestbps, chol, thalach) %>% gather() %>%
   ggplot(aes(value)) +
   geom_histogram(bins = 30) +
   facet_wrap(~key, scales = 'free') +
   labs(title = 'Distribuciones: age, trestbps, chol, thalach')
 
 #  - Boxplots por target
-heart %>% pivot_longer(cols = c(age, trestbps, chol, thalach), names_to = 'feature') %>%
+heart %>% 
+  # no recuerdo sobre el pivote se pueda usar, pero hay una alternativa sin dependencias
+  # gather(key = "feature", value = "value", age, trestbps, chol, thalach)
+  pivot_longer(cols = c(age, trestbps, chol, thalach), names_to = 'feature') %>%
   ggplot(aes(x = factor(target), y = value)) + geom_boxplot() + facet_wrap(~feature, scales = 'free') +
   labs(x = 'target', title = 'Boxplots por target')
+```
 
-# 3) Hipótesis nula (ejemplos):
+### 3) Hipótesis nula (ejemplos):
+```{R planteo-hipotesis}
 #  H0: No hay asociación entre el tipo de dolor en el pecho (cp) y la presencia de enfermedad cardiaca (target).
 #  H1: Existe asociación entre cp y target.
 # Se puede probar con test chi-cuadrado sobre la tabla cp vs target.
+chisq_test_cp <- heart %>% 
+  select(cp, target) %>% 
+  table() %>% 
+  chisq.test()
 
-chisq_test_cp <- heart %>% select(cp, target) %>% table() %>% chisq.test()
 chisq_test_cp
+```
+
+
 
 # 4) Correlaciones y mapa de calor (solo variables numéricas)
 num_vars <- heart %>% select_if(is.numeric)

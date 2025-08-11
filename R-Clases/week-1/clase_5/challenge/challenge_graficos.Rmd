@@ -29,7 +29,7 @@ data$cp <- factor(data$cp, levels = c(0, 1, 2, 3),
                   labels = c("Typical Angina", "Atypical Angina", "Non-anginal", "Asymptomatic"))
 data$fbs <- factor(data$fbs, levels = c(0, 1), labels = c("<=120 mg/dl", ">120 mg/dl"))
 
-
+head(data)
 ```
 
 ---

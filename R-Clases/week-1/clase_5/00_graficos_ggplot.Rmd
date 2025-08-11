@@ -33,10 +33,10 @@ library(ggplot2)            # Cargar
 
 ```r
 ggplot(
-  data = datos, # fuente de data
+  data = datos,                       # fuente de data
   aes(x = variable_x, y = variable_y) # mapping columns 
-  ) +           # Capa base
-  geom_point() # Capa visual
+  ) +                                 # Capa base
+  geom_point()                        # Capa visual
 ```
 - **`data`**: Tu dataframe.
 - **`aes()`**: Estética (mapeo de variables a ejes/colores/tamaños).
@@ -54,8 +54,9 @@ head(iris)
 ### **a) Gráfico de dispersión (`geom_point`)**
 ```{R}
 ggplot(
-  iris,
+  data = iris, # dataframe
   aes(x = Sepal.Length, y = Sepal.Width, color = Species)
+  # aes(x = Sepal.Length, y = Sepal.Width)
   ) +
   geom_point(size = 3, alpha = 0.7) +
   labs(title = "Longitud vs Ancho del Sépalo", x = "Longitud", y = "Ancho")
@@ -187,7 +188,9 @@ library(plotly)
 
 p <- ggplot(iris, aes(x = Sepal.Length, y = Sepal.Width, color = Species)) +
   geom_point()
-# ggplotly(p)  # Convierte ggplot en interactivo
+
+
+ggplotly(p)  # Convierte ggplot en interactivo
 ```
 
 ---
