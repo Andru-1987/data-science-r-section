@@ -10,7 +10,7 @@
 
 ---
 
-# 2. Estructura de la clase 
+# 2. Estructura de modelos de machine learning
 
 ## 2.1 Carga de la data
 
@@ -55,8 +55,8 @@ Actividades:
 ## 2.4 Obtención de hipótesis (generar insights accionables)
 
 _Algunas ideas para encontrar algunas conjeturas_
-[Obtencion de buenos insights](assets/como_obtener_buenos_insights.md)
-[Checklist para obtener insights](assets/preguntas_buenos_insights.md)
+  * [Obtencion de buenos insights](./assets/02_08_como_obtener_buenos_insights.md)
+  * [Checklist para obtener insights](./assets/02_08_preguntas_buenos_insights.md)
 
 * “La variable X se asocia positivamente con la target; esperamos coeficiente > 0.”
 * “Variables A y B interactúan: su efecto conjunto es mayor que la suma.”

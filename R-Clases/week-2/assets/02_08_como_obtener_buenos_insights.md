@@ -83,7 +83,7 @@ Ejemplo:
 
 ## 4. Buenas prácticas para obtener insights sólidos
 
-* **Triangular**: usar gráficos, estadísticas descriptivas y conocimiento del negocio.
+* **Triangular**: usar gráficos, estadísticas descriptivas y `conocimiento del negocio`.
 * **Buscar lo inesperado**: patrones que contradigan la intuición inicial.
 * **Formular hipótesis negativas**: no sólo buscar lo que confirma ideas previas.
 * **Revisar subgrupos**: lo que es cierto globalmente puede no serlo para todos los segmentos.

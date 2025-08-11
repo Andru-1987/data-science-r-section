@@ -19,9 +19,8 @@ geometry: margin=1in
 
 
 ```{R install, include=FALSE}
-packages <- c("tidymodels", "ggplot2", "dplyr")
+packages <- c("tidymodels", "ggplot2", "dplyr","glmnet", "ranger", "xgboost")
 install.packages(setdiff(packages, rownames(installed.packages())))
-
 ```
 
 ```{R setup, include=FALSE}
@@ -45,12 +44,69 @@ glimpse(mtcars)
 summary(mtcars)
 ```
 
+### *renombre de variables*
+
+```{R rename-dataset}
+library(dplyr)
+
+names_mtcars <- c(
+  "miles_per_gallon",     # mpg
+  "num_cylinders",        # cyl
+  "displacement",         # disp
+  "horsepower",          # hp
+  "rear_axle_ratio",     # drat
+  "weight",              # wt
+  "quarter_mile_time",   # qsec
+  "engine_type",         # vs (0 = V-shaped, 1 = straight)
+  "transmission",        # am (0 = automatic, 1 = manual)
+  "num_gears",          # gear
+  "num_carburetors"     # carb
+)
+
+mtcars <- mtcars %>%initial_split
+  `names<-`(names_mtcars)
+
+summary(mtcars)
+```
+
+
+```{R nullish-validate}
+
+null_counts <- mtcars %>%
+  summarise_all(~ sum(is.na(.))) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Null_Count")
+
+print(null_counts)
+
+p1 <- ggplot(
+  data=null_counts,
+  aes(x = reorder(Variable, -Null_Count), y = Null_Count)) +
+
+  geom_bar(stat = "identity", fill = "steelblue", alpha = 0.7) +
+  geom_text(aes(label = Null_Count), vjust = -0.3, size = 3.5) +
+  labs(
+    title = "Cantidad de Valores Nulos por Variable",
+    subtitle = "Dataset: mtcars",
+    x = "Variables",
+    y = "Número de Valores Nulos"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 12)
+  )
+
+print(p1)
+
+```
+
 ---
 
 # 3. Definición de variables
 
-La **variable objetivo** será `mpg` (millas por galón)
-La **variable predictora** inicial: `wt` (peso del vehículo en 1000 lbs).
+La **variable objetivo** será `mpg` (millas por galón): **miles_per_gallon**
+La **variable predictora** inicial `wt` (peso del vehículo en 1000 lbs): **weight**
 
 ---
 
@@ -58,7 +114,7 @@ La **variable predictora** inicial: `wt` (peso del vehículo en 1000 lbs).
 
 ```{R}
 mtcars %>%
-  ggplot(aes(x = wt, y = mpg)) +
+  ggplot(aes(x = weight, y = miles_per_gallon)) +
   geom_point(color = "steelblue", size = 3) +
   geom_smooth(method = "lm", se = FALSE, color = "darkred") +
   labs(title = "Relación entre peso y consumo de combustible",
@@ -71,21 +127,38 @@ mtcars %>%
 # 5. Train/Test Split
 
 ```{R}
-set.seed(123)
-split <- initial_split(mtcars, prop = 0.8, strata = mpg)
+set.seed(42)
+split <- initial_split(mtcars, prop = 0.8)
 train_data <- training(split)
 test_data  <- testing(split)
+
 ```
 
 ---
+
+#### tidymodels 
+- *[tidymodels oficial](https://www.tidymodels.org/)*
+- *[tidymodels sample](https://diegokoz.github.io/EEA2019/clase%208/tidymodels.nb.html)*
+
+- *rsample: for data splitting and resampling*
+- *recipes: for data preprocessing and feature engineering*
+- *parsnip: for model specification with unified syntax*
+- *workflows: for combining preprocessing and models*
+- *tune: for hyperparameter tuning*
+- *yardstick: for model evaluation metrics*
+
 
 # 6. Receta de preprocesamiento
 
 Incluimos normalización de variables predictoras.
 
 ```{R}
-car_recipe <- recipe(mpg ~ wt, data = train_data) %>%
-  step_normalize(all_numeric_predictors())
+car_recipe <- recipe(
+  miles_per_gallon ~ ., data = train_data) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_zv(all_predictors()) %>%  # Remueve variables con varianza cero
+  step_corr(all_numeric_predictors(), threshold = 0.9)  # Remueve variables muy correlacionadas
 ```
 
 ---
@@ -93,118 +166,392 @@ car_recipe <- recipe(mpg ~ wt, data = train_data) %>%
 # 7. Modelo base: Regresión Lineal
 
 ```{R}
+
 lm_model <- linear_reg() %>%
   set_engine("lm") %>%
   set_mode("regression")
 
-lm_wf <- workflow() %>%
+
+car_workflow <- workflow() %>%
   add_recipe(car_recipe) %>%
   add_model(lm_model)
 
-lm_fit <- lm_wf %>%
-  fit(data = train_data)
-
-lm_fit
 ```
 
 ---
 
 # 8. Predicción y métricas en test
 
-```{R}
-lm_pred <- predict(lm_fit, test_data) %>%
-  bind_cols(test_data)
+```{R prediccion-metricas}
 
-metrics(lm_pred, truth = mpg, estimate = .pred)
+fitted_workflow <- fit(car_workflow, data=train_data)
+
+print("predictions -> prediccion .pred del modelo")
+linear_reg_predictions <- predict(fitted_workflow, new_data = test_data)
+
+print("predictions -> predicciones intervalo de confianza .pred_upper, .pred_lower")
+linear_reg_predictions_intervals <- predict(fitted_workflow, new_data = test_data, type = "conf_int")
+
+print("merge de estas predicciones")
+linear_reg_predictions <- bind_cols(test_data, linear_reg_predictions, linear_reg_predictions_intervals)
+
+print("Nombre de las columnas de prediccion")
+colnames(linear_reg_predictions)
+
+print("Modelo entrenado:")
+fitted_workflow
+
+print("Predicciones:")
+linear_reg_predictions
 ```
 
----
+#### Metricas
+```{R metricas}
 
-# 9. Modelos regularizados (Ridge y Lasso)
+metrics_tbl <- metrics(
+  linear_reg_predictions,
+  truth = miles_per_gallon,
+  estimate = .pred
+) %>%
+  as_tibble()
 
-Usaremos `glmnet` vía `parsnip`.
 
-```{R}
-ridge_model <- linear_reg(penalty = tune(), mixture = 0) %>% # Ridge
-  set_engine("glmnet") %>%
-  set_mode("regression")
+# metrics <- as_tibble(metrics(linear_reg_predictions, truth = miles_per_gallon, estimate = .pred))
 
-lasso_model <- linear_reg(penalty = tune(), mixture = 1) %>% # Lasso
-  set_engine("glmnet") %>%
-  set_mode("regression")
-```
+print(metrics)
 
----
-
-# 10. Validación cruzada y tuning
-
-```{R}
-set.seed(123)
-folds <- vfold_cv(train_data, v = 5)
-
-grid <- grid_regular(penalty(range = c(-3, 1)), levels = 30)
-
-ridge_wf <- workflow() %>% add_recipe(car_recipe) %>% add_model(ridge_model)
-lasso_wf <- workflow() %>% add_recipe(car_recipe) %>% add_model(lasso_model)
-
-ridge_res <- tune_grid(ridge_wf, resamples = folds, grid = grid, metrics = metric_set(rmse))
-lasso_res <- tune_grid(lasso_wf, resamples = folds, grid = grid, metrics = metric_set(rmse))
-```
-
----
-
-# 11. Resultados de tuning
-
-```{R}
-autoplot(ridge_res) + ggtitle("Tuning Ridge")
-autoplot(lasso_res) + ggtitle("Tuning Lasso")
-```
-
----
-
-# 12. Selección de hiperparámetros óptimos
-
-```{R}
-best_ridge <- select_best(ridge_res, "rmse")
-best_lasso <- select_best(lasso_res, "rmse")
-
-final_ridge <- finalize_workflow(ridge_wf, best_ridge) %>% fit(data = train_data)
-final_lasso <- finalize_workflow(lasso_wf, best_lasso) %>% fit(data = train_data)
-```
-
----
-
-# 13. Comparativa en test set
-
-```{R}
-ridge_pred <- predict(final_ridge, test_data) %>% bind_cols(test_data)
-lasso_pred <- predict(final_lasso, test_data) %>% bind_cols(test_data)
-
-bind_rows(
-  metrics(lm_pred, truth = mpg, estimate = .pred) %>% mutate(model = "Lineal"),
-  metrics(ridge_pred, truth = mpg, estimate = .pred) %>% mutate(model = "Ridge"),
-  metrics(lasso_pred, truth = mpg, estimate = .pred) %>% mutate(model = "Lasso")
+# Calcular RMSE
+test_rmse <- rmse(
+  data = linear_reg_predictions,
+  truth = miles_per_gallon,
+  estimate = .pred
 )
+
+# Calcular MAE
+test_mae <- mae(
+  data = linear_reg_predictions,
+  truth = miles_per_gallon,
+  estimate = .pred
+)
+
+# Calcular R²
+test_rsq <- rsq(
+  data = linear_reg_predictions,
+  truth = miles_per_gallon,
+  estimate = .pred
+)
+
+# Mostrar resultados
+cat("Test RMSE:", round(test_rmse$.estimate, 4), "\n")
+cat("Test MAE :", round(test_mae$.estimate, 4), "\n")
+cat("Test R²  :", round(test_rsq$.estimate, 4), "\n")
 ```
+
+
+## 1. **RMSE** — *Root Mean Squared Error* (Raíz del Error Cuadrático Medio)
+
+**Qué mide:**
+
+* El **promedio** del tamaño de los errores, pero elevando al cuadrado las diferencias antes de promediarlas y luego sacando la raíz.
+* Penaliza más fuerte los errores grandes (outliers).
+
+**Interpretación:**
+
+* Cuanto **menor**, mejor (cero sería predicción perfecta).
+* Está en **las mismas unidades** que la variable objetivo (`miles_per_gallon` en tu caso).
+
+**Ejemplo:**
+Si predices 20 y el valor real es 22 (error de 2), y otra vez predices 20 pero el real es 28 (error de 8), el segundo error influye mucho más en el RMSE que el primero.
 
 ---
 
-# 14. Diagnóstico de residuos del modelo lineal
+## 📏 2. **MAE** — *Mean Absolute Error* (Error Medio Absoluto)
+
+**Qué mide:**
+
+* El promedio del valor **absoluto** de las diferencias entre predicciones y valores reales.
+* Todos los errores pesan igual.
+
+**Interpretación:**
+
+* Cuanto **menor**, mejor.
+* También está en las mismas unidades de la variable objetivo.
+
+**Ejemplo:**
+Si tienes errores de 2 y 8, el MAE = (2 + 8) / 2 = 5, sin importar que el segundo error sea mucho mayor.
+
+---
+
+## 📈 3. **R²** — *Coeficiente de Determinación*
+
+**Qué mide:**
+
+* La **proporción de la varianza** de la variable objetivo que el modelo es capaz de explicar.
+* Valores van de:
+
+  * **1.0** → predicción perfecta
+  * **0.0** → el modelo no mejora nada respecto a predecir la media
+  * Negativo → el modelo es peor que usar la media como predicción
+
+**Interpretación:**
+
+* Si R² = 0.76, significa que el modelo explica el **76% de la variabilidad** de la variable objetivo.
+
+---
+
+## Resumen rápido
+
+| Métrica | Rango  | Mejor valor | Penaliza más errores grandes? | Unidades              |
+| ------- | ------ | ----------- | ----------------------------- | --------------------- |
+| RMSE    | 0 → ∞  | 0           | ✅ Sí                          | Igual que la variable |
+| MAE     | 0 → ∞  | 0           | ❌ No                          | Igual que la variable |
+| R²      | -∞ → 1 | 1           | ❌ (es porcentual)             | No aplica             |
+
+---
+
+Regla práctica:
+
+* **RMSE**: Úsalo cuando quieres ser más sensible a errores grandes.
+* **MAE**: Úsalo cuando quieres un promedio más “justo” que no castigue tanto outliers.
+* **R²**: Úsalo para explicar cuánta variabilidad estás capturando, no para medir el error absoluto.
+---
+
+
+```{R valores-reales-vs-prediccion}
+library(ggplot2)
+
+ggplot(linear_reg_predictions, aes(x = miles_per_gallon, y = .pred)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_errorbar(aes(ymin = .pred_lower, ymax = .pred_upper), width = 0.2, alpha = 0.5) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+  labs(
+    title = "Valores Reales vs Predichos con Intervalos de Confianza",
+    subtitle = paste0(
+      "RMSE: ", round(test_rmse$.estimate, 2),
+      " | MAE: ", round(test_mae$.estimate, 2),
+      " | R²: ", round(test_rsq$.estimate, 2)
+    ),
+    x = "Valor Real (miles_per_gallon)",
+    y = "Valor Predicho"
+  ) +
+  theme_minimal()
+```
+
+
+--- 
+## Agregar algunos otros modelos para encontrar un mejor modelo adaptable
 
 ```{R}
-augment(lm_fit$fit$fit) %>%
-  ggplot(aes(.fitted, .resid)) +
-  geom_point(color = "steelblue") +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  labs(title = "Residuos vs Ajustados (modelo lineal)",
-       x = "Valores ajustados",
-       y = "Residuos")
+
+# Modelo 1: Regresión Lineal
+lm_model <- linear_reg() %>% set_engine("lm") %>% set_mode("regression")
+
+ridge_model <- linear_reg(penalty = tune(), mixture = 0) %>% set_engine("glmnet")
+lasso_model <- linear_reg(penalty = tune(), mixture = 1) %>% set_engine("glmnet")
+
+# Modelo 2: Random Forest (sin tuning por ahora)
+rf_model <- rand_forest(trees = 500) %>% set_engine("ranger") %>% set_mode("regression")
+
+# Modelo 3: XGBoost (sin tuning por ahora)
+xgb_model <- boost_tree(trees = 500) %>% set_engine("xgboost") %>% set_mode("regression")
+
+
+workflows <- list(
+  lm = workflow() %>% add_recipe(car_recipe) %>% add_model(lm_model),
+  ridge = workflow() %>% add_recipe(car_recipe) %>% add_model(ridge_model),
+  lasso = workflow() %>% add_recipe(car_recipe) %>% add_model(lasso_model),
+  rf = workflow() %>% add_recipe(car_recipe) %>% add_model(rf_model),
+  xgb = workflow() %>% add_recipe(car_recipe) %>% add_model(xgb_model)
+)
+
 ```
+
+```{R}
+set.seed(42)
+
+# Validación cruzada
+cv_splits <- vfold_cv(
+    train_data
+  , v = 5)
+  # , strata = miles_per_gallon)
+
+# Grid para tuning (solo para penalty)
+penalty_grid <- grid_regular(penalty(range = c(-5, 0)), levels = 20) # log10 scale
+
+# Tunear ridge
+ridge_tune_results <- tune_grid(
+  workflows$ridge,
+  resamples = cv_splits,
+  grid = penalty_grid,
+  metrics = metric_set(rmse, mae, rsq)
+)
+
+# Tunear lasso
+lasso_tune_results <- tune_grid(
+  workflows$lasso,
+  resamples = cv_splits,
+  grid = penalty_grid,
+  metrics = metric_set(rmse, mae, rsq)
+)
+
+# Seleccionar mejores parámetros (basado en rmse)
+best_ridge <- select_best(ridge_tune_results, metric ="rmse")
+best_lasso <- select_best(lasso_tune_results, metric ="rmse")
+
+# Finalizar workflows con mejores parámetros
+final_ridge <- finalize_workflow(workflows$ridge, best_ridge)
+final_lasso <- finalize_workflow(workflows$lasso, best_lasso)
+
+# Ajustar modelos finales con tuning
+ridge_fit <- fit(final_ridge, data = train_data)
+lasso_fit <- fit(final_lasso, data = train_data)
+
+# Ajustar modelos sin tuning directo
+lm_fit <- fit(workflows$lm, data = train_data)
+rf_fit <- fit(workflows$rf, data = train_data)
+xgb_fit <- fit(workflows$xgb, data = train_data)
+
+# Función para evaluar en test set
+evaluate_model <- function(fitted_wf, test_data) {
+  preds <- predict(fitted_wf, test_data) %>%
+    bind_cols(test_data)
+  metrics(preds, truth = miles_per_gallon, estimate = .pred)
+}
+
+# Evaluar todos
+lm_metrics <- evaluate_model(lm_fit, test_data) %>% mutate(model = "Linear Regression")
+ridge_metrics <- evaluate_model(ridge_fit, test_data) %>% mutate(model = "Ridge Regression")
+lasso_metrics <- evaluate_model(lasso_fit, test_data) %>% mutate(model = "Lasso Regression")
+rf_metrics <- evaluate_model(rf_fit, test_data) %>% mutate(model = "Random Forest")
+xgb_metrics <- evaluate_model(xgb_fit, test_data) %>% mutate(model = "XGBoost")
+
+# Combinar métricas
+all_metrics <- bind_rows(lm_metrics, ridge_metrics, lasso_metrics, rf_metrics, xgb_metrics)
+
+
+cat("Mejor modelo según RMSE:\n")
+
+all_metrics_wide <- all_metrics %>%
+  select(model, .metric, .estimate) %>%
+  pivot_wider(
+    names_from = .metric,
+    values_from = .estimate
+  ) %>%
+  arrange(desc(rsq))
+
+print(all_metrics_wide)
+```
+
+
+
+
+# Diagnóstico de residuos del modelo lineal
+
+```{R}
+library(tidymodels)
+library(ggplot2)
+library(gridExtra)  # Para mostrar múltiples gráficos juntos
+
+
+best_model_name <- all_metrics_wide %>%
+  slice(1) %>%
+  pull(model)
+
+
+fits_list <- list(
+  "Linear Regression" = lm_fit,
+  "Ridge Regression" = ridge_fit,
+  "Lasso Regression" = lasso_fit,
+  "Random Forest" = rf_fit,
+  "XGBoost" = xgb_fit
+)
+
+best_fit <- fits_list[[best_model_name]]
+
+library(ggplot2)
+library(gridExtra)
+
+predictions <- predict(best_fit, test_data) %>%
+  bind_cols(test_data) %>%
+  mutate(
+    residuals = miles_per_gallon - .pred,
+    fitted = .pred,
+    abs_residuals = abs(residuals),
+    sqrt_abs_residuals = sqrt(abs_residuals)
+  )
+
+p1 <- ggplot(predictions, aes(x = fitted, y = residuals)) +
+  geom_point(alpha = 0.6) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = paste("Residuales vs Ajustados -", best_model_name),
+       x = "Valores Ajustados (.pred)",
+       y = "Residuales") +
+  theme_minimal()
+
+p2 <- ggplot(predictions, aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line() +
+  labs(title = paste("QQ-Plot de Residuales -", best_model_name)) +
+  theme_minimal()
+
+p3 <- ggplot(predictions, aes(x = residuals)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black", alpha = 0.7) +
+  labs(title = paste("Histograma de Residuales -", best_model_name),
+       x = "Residuales",
+       y = "Frecuencia") +
+  theme_minimal()
+
+p4 <- ggplot(predictions, aes(x = fitted, y = abs_residuals)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  labs(title = paste("Residuales Absolutos vs Ajustados -", best_model_name),
+       x = "Valores Ajustados (.pred)",
+       y = "Valor Absoluto de Residuales") +
+  theme_minimal()
+
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+
+```
+
+### 1. Residuales vs Valores Ajustados
+
+* **Qué muestra:** Cada punto es un residuo (error real vs predicho) frente al valor predicho para ese punto.
+* **Cómo interpretarlo:**
+
+  * Idealmente, los puntos deben estar **dispersos al azar alrededor de cero**, sin formar patrones.
+  * Si ves **curvas, líneas o embudos**, indica que el modelo no está capturando bien la relación o que la varianza de los errores no es constante (heterocedasticidad).
+  * Una banda horizontal y dispersa indica que el modelo es adecuado en este sentido.
 
 ---
 
-# 15. Conclusiones
+### 2. QQ-Plot de Residuales
 
-* La regresión lineal es un **modelo base rápido e interpretable**.
-* Ridge y Lasso permiten manejar **multicolinealidad** y mejorar generalización.
-* Siempre evaluar con un set de test separado y, si es posible, con validación cruzada.
+* **Qué muestra:** Compara la distribución de los residuos con una distribución normal teórica.
+* **Cómo interpretarlo:**
+
+  * Si los puntos caen aproximadamente sobre la línea diagonal, los residuos se comportan como si vinieran de una distribución normal, lo que es un supuesto importante para inferencias clásicas.
+  * Desviaciones fuertes (curvas o puntos alejados) indican que los residuos no son normales, lo que puede afectar la validez de tests estadísticos y de confianza.
+
+---
+
+### 3. Histograma de Residuales
+
+* **Qué muestra:** Distribución de la frecuencia de los residuos.
+* **Cómo interpretarlo:**
+
+  * Idealmente, debe tener forma de campana, simétrica y centrada en cero.
+  * Si hay sesgos (asimetría), múltiples picos o colas largas, indica que los residuos no son normales.
+  * También ayuda a detectar valores atípicos o errores sistemáticos.
+
+---
+
+### 4. Residuales Absolutos vs Valores Ajustados
+
+* **Qué muestra:** El valor absoluto de los residuos (es decir, el tamaño del error sin importar el signo) en función de los valores predichos.
+* **Cómo interpretarlo:**
+
+  * Busca patrones en la variabilidad de los residuos.
+  * Si la dispersión aumenta o disminuye con los valores predichos (forma de embudo, por ejemplo), significa **heterocedasticidad**, es decir, la varianza de los errores no es constante.
+  * Esto puede indicar que el modelo necesita transformaciones o modelos más complejos para ajustarse bien.
+

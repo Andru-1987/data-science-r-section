@@ -4,7 +4,10 @@ FROM rocker/r-ver:latest
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Instalar dependencias del sistema
+
 RUN apt-get update && apt-get install -y \
+    libconfig1-dev \
+    libfreetype6-dev \
     libcurl4-openssl-dev \
     libssl-dev \
     libxml2-dev \
@@ -44,4 +47,4 @@ COPY post-create.sh /workspaces/post-create.sh
 RUN chmod +x /workspaces/post-create.sh
 
 # Establecer carpeta de trabajo
-WORKDIR /workspaces/R-Clases
+WORKDIR /workspaces/R-Clasescode z

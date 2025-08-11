@@ -1,0 +1,568 @@
+---
+title: "Arboles de decisión con R - Clasificación"
+author: "Julio Paredes"
+output: 
+  html_document: 
+    df_print: tibble
+    fig_height: 7.5
+    fig_width: 7.5
+    highlight: tango
+    theme: yeti
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+🌳 Implementación de Árboles de Decisión en R 🌳
+
+En este clase, exploraremos cómo implementar árboles de decisión en R utilizando el paquete rpart. Descubrirás los fundamentos de los árboles de clasificación, junto con algunos problemas comunes al procesar datos en R. ¡Empecemos!
+
+**Introducción a los Árboles de Decisión**
+
+Los árboles de decisión son como diagramas de flujo utilizados para predecir resultados en diferentes disciplinas. En aprendizaje automático, empleamos la técnica CART (Classification And Regression Trees), una forma de aprendizaje supervisado donde buscamos una función que prediga la variable objetivo basada en variables predictoras.
+
+**Implementación con RPART**
+
+Usaremos RPART (Recursive Partitioning and Regression Trees), una implementación específica de CART. Este algoritmo busca la mejor separación de datos en grupos utilizando reglas, formando nodos y hojas en un árbol.
+
+**Ventajas y *Desventajas**
+
+Los árboles de decisión ofrecen interpretabilidad y son computacionalmente eficientes, pero pueden ser sensibles a la muestra de datos y propensos al sobreajuste.
+
+📚 Para una comprensión más profunda, consulta este documento sobre el concepto de "mejor separación" https://cran.r-project.org/web/packages/rpart/vignettes/longintro.pdf.
+
+**Preparando el Entorno**
+
+Utilizaremos los siguientes paquetes:
+
+tidyverse: Para el procesamiento de datos.
+rpart: Implementación de árboles de clasificación.
+rpart.plot: Para visualizar resultados.
+caret: Utilidades para clasificación y regresión, incluyendo matrices de confusión.
+
+
+```{r, message=FALSE}
+library(tidyverse)
+library(rpart)
+library(rpart.plot)
+library(caret)
+```
+
+Lo que sigue es conseguir nuestros datos.
+
+# Importando nuestros datos
+Descargaremos el conjunto de datos de vino, disponible en el Machine Learning Repository.
+
+* https://archive.ics.uci.edu/ml/datasets/Wine
+
+Necesitamos descargar dos archivos. El primero contiene los datos que usaremos, y el segundo contiene su descripción (metadatos), la cual nos será de gran utilidad más adelante.
+
+```{r, eval=FALSE}
+# Datos
+download.file("https://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data", "wine.data")
+
+# Información
+download.file("https://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.names", "wine.names")
+```
+
+Como habrás notado, nuestros datos tienen una extensión de archivo no convencional: **.data**. En **R** no existe una función específica para leer archivos con esta extensión, similar a `red.csv()` o `read.dat()`, las cuales nos facilitan tarea de importar archivos de formatos específicos. Lo mismmo pasa con el archivo con su descripción, que tiene la extensión **.name**.
+
+Necesitamos explorar estos archivos para saber cómo podemos leerlos. Para estos casos, usamos la función `readLines()`, que lee archivos, línea por línea, independientemente de su extensión o formato. con el argumento `n = 10` indicamos que sólo deseamos leer las primeras diez líneas de cada archivo.
+
+Empezamos con los datos.
+```{r}
+readLines("wine.data", n = 10)
+```
+
+El archivo de datos parece ser una tabla de datos rectangular, con columnas separadas por comas. Entonces leer este archivo es fácil. El único inconveniente que tenemos es que nos faltan los nombres de cada columna.
+
+Podemos usar `read_table()` para leer este archivo. Esta función está diseñada para leer tablas de datos, es decir, con estructura rectangular (renglones y columnas).
+
+Para asegurarnos que los datos serán leídos de manera correcta, especificamos que el separador de las columnas es una coma (`sep = ","`) y que no tenemos nombres de columna en nuestro archivo (`header = FALSE`). Asignamos el resultado al objeto **vino**.
+```{r}
+vino <- read.table("wine.data", sep = ",", header = FALSE)
+```
+
+Veamos los datos.
+```{r}
+vino
+```
+
+Tenemos 178 renglones y 14 columnas. Aunque aún no sabemos que contienen.
+
+Veamos si el archivo **wine.names** tiene respuestas.
+```{r}
+readLines("wine.names", n = 10)
+```
+
+Parece ser un archivo de texto común y corriente, pero con una extensión inusual. Podemos crear una copia de este archivo con la extensión a **.txt** con `file.copy()` para leerlo fácilmente en bloc de notas o cualquier aplicación similar. Después, usamos `file.show()` para darle una lectura.
+```{r, eval=FALSE}
+file.copy(from = "wine.names", to = "wine_names.txt")
+
+file.show("wine_names.txt")
+```
+
+A partir de lo que este documento explica, descubrimos que nuestros datos corresponden a trece características químicas de tres tipos de vinos. Esto quiere decir que una de las columnas de nuestros datos indica el tipo de vino y las otras trece son sus características.
+
+Aunque es probable que la primera columna de nuestros datos sea la variable con el tipo de vino, usamos `summary()` para asegurarnos
+```{r}
+summary(vino)
+```
+
+Como la **V1** es la única con un valor mínimo de 1 y máximo de 3, es seguro que corresponde al tipo de vino, así que podemos renombrarla para facilitar el análisis.
+
+El resto de nombres de columna los podemos obtener del archivo con la información de los datos, haciendo algo de manipulación con expresiones regulares (regex), a través de `gsub()`.
+
+```{r}
+# Leemos las líneas del archivo "wine_names.txt" y seleccionamos las líneas del 58 al 70
+nombres <- readLines("wine_names.txt")[58:70] %>% 
+  # Utilizamos gsub para eliminar cualquier carácter de control y lo que sigue hasta ")"
+  gsub("[[:cntrl:]].*\\)", "", .) %>% 
+  # Eliminamos espacios en blanco al principio y al final de cada nombre
+  trimws() %>% 
+  # Convertimos todos los caracteres a minúsculas
+  tolower() %>% 
+  # Reemplazamos espacios y "/" con "_"
+  gsub(" |/", "_", .) %>% 
+  # Agregamos el nombre "tipo" como primera columna para los tipos de vino
+  c("tipo", .)
+
+```
+
+Ahora podemos cambiar los nombres de nuestros datos.
+```{r}
+names(vino) <- nombres 
+vino
+```
+
+Por último, cambiamos el tipo de dato de la columna **tipo** a **factor** usando la función `mutate_at()` de *dplyr*, para poder hacer clasificaciones. De otro modo, como esta columna tiene valores numéricos, podemos tener conflictos más adelante. 
+```{r}
+vino <- vino %>% 
+  mutate_at("tipo", factor)
+vino
+```
+
+Ahora sí, empecemos a crear árboles de clasificación.
+
+# Creando un sets de entrenamiento y prueba
+Necesitamos un set de entrenamiento para generar un modelo predictivo, y un set de prueba, para comprobar la eficacia de este modelo para hacer predicciones correctas.
+
+Usamos la función `sample_frac()` de *dplyr* para obtener un subconjunto de nuestros datos, que consiste en 70% del total de ellos. Usamos también `set.seed()` para que este ejemplo sea reproducible.
+```{r}
+set.seed(1649)
+vino_entrenamiento <- sample_frac(vino, .7)
+```
+
+Con `setdiff()` de *dplyr*, obtenemos el subconjunto de datos complementario al de entrenamiento para nuestro set de prueba, esto es, el 30% restante.
+```{r}
+vino_prueba <- setdiff(vino, vino_entrenamiento)
+```
+
+
+
+# Entrenando nuestro modelo
+Usamos la función `rpart` de *rpart* para entrenar nuestro modelo. Esta función nos pide una formula para especificar la variable objetivo de la clasificación. La formula que usaremos es `tipo ~ .`, la cual expresa que intentaremos clasificar **tipo** usando a todas las demás variables como predictoras.
+
+En este primer intento no ajustaremos ningún otro parámetro.
+```{r}
+arbol_1 <- rpart(formula = tipo ~ ., data = vino_entrenamiento)
+```
+
+Es hora de ver cómo nos ha ido con nuestro modelo
+
+# Evaluando nuestro modelo
+Del entrenamiento de nuestro modelo obtenemos el siguiente resultado.
+```{r}
+arbol_1
+```
+
+*root 125 75 2 (0.352 0.400 0.248)*
+
+*Hay 125 observaciones totales en el nodo raíz.*
+
+75 se clasificarían mal si asignamos a todo el nodo la clase predicha.
+
+La clase predicha (yval) es 2 (la segunda clase).
+
+En el nodo, la proporción de clases es (35.2% de la 1, 40% de la 2, 24.8% de la 3).
+
+proline >= 755 48 6 1 (0.875 0.042 0.083) # recorda que 755 es el punto de corte
+
+De las 125 observaciones, 48 cumplen proline >= 755.
+
+Si asignamos a todo ese subnodo la clase 1, cometeríamos 6 errores.
+
+La clase predicha es 1 y sus proporciones internas son 87.5% (clase 1), 4.2% (clase 2), 8.3% (clase 3).
+
+flavanoids >= 2.35 41 1 1 (0.976 0.024 0.000)
+
+Dentro del subnodo de proline >= 755, 41 cumplen flavanoids >= 2.35.
+
+Si asignamos a todo ese subnodo la clase 1, hay solo 1 error.
+
+La clase predicha es 1 con 97.6% de observaciones de clase 1.
+
+El asterisco (*) indica que es un nodo terminal (no se divide más).
+
+flavanoids < 2.35 7 3 3 (0.286 0.143 0.571)
+
+En el subnodo hermano, hay 7 observaciones (aún con proline >= 755 pero flavanoids < 2.35).
+
+Se equivocaría en 3 si se rotula con la clase 3.
+
+La clase predicha es 3, con proporciones 28.6% (clase 1), 14.3% (clase 2), 57.1% (clase 3).
+
+También es un nodo terminal.
+
+proline < 755 77 29 2 (0.026 0.623 0.351)
+
+El otro gran subnodo del nodo raíz contiene 77 observaciones con proline < 755.
+
+Se equivocarían 29 si se rotula todo como clase 2.
+
+Predice clase 2, con proporciones 2.6% (clase 1), 62.3% (clase 2), 35.1% (clase 3).
+
+flavanoids >= 1.265 51 4 2 (0.039 0.922 0.039)
+
+Dentro de proline < 755, hay 51 casos con flavanoids >= 1.265.
+
+Cometería 4 errores si todo se cataloga como clase 2.
+
+Predice clase 2, con distribución 3.9% (clase 1), 92.2% (clase 2), 3.9% (clase 3).
+
+Nodo terminal.
+
+flavanoids < 1.265 26 1 3 (0.000 0.038 0.962)
+
+Por último, 26 observaciones cumplen proline < 755 y flavanoids < 1.265.
+
+Se equivocaría en 1 si se rotula como clase 3.
+
+Predice clase 3, con un 96.2% perteneciente a la clase 3.
+
+Nodo terminal.
+
+En resumen, el árbol divide primero según la variable proline y, dentro de cada rama, ajusta el corte con flavanoids. Cada nodo terminal muestra cuántas observaciones terminan allí, cuántas se equivocarían si se etiquetan con la clase mayoritaria de ese nodo y cuál es la distribución de las clases en ese nodo.
+
+
+```{r}
+rpart.plot(arbol_1)
+```
+
+En estos gráficos, cada uno de los rectángulos representa un **nodo** de nuestro árbol, con su regla de clasificación. 
+
+Cada nodo está coloreado de acuerdo a la categoría mayoritaria entre los datos que agrupa. Esta es la categoría que ha predicho el modelo para ese grupo.
+
+Dentro del rectángulo de cada nodo se nos muestra qué proporción de casos pertenecen a cada categoría y la proporción del total de datos que han sido agrupados allí. Por ejemplo, el rectángulo en el extremo inferior izquierdo de la gráfica tiene 94% de casos en el tipo 1, 2% el tipos 2 y 0% en el tipo 3, que representan 33% de todos los datos.
+
+Estas proporciones nos dan una idea de la precisión de nuestro modelo al hacer predicciones. De este modo, las reglas que conducen al rectángulo que acabamos de mencionar nos dan un 94% de clasificaciones correctas. 
+
+
+Pero, por supuesto, necesitamos ser más sistemáticos para indagar qué tan bien hace predicciones nuestro modelo.
+
+Usamos la función `precict()` con nuestro set de prueba para generar un vector con los valores predichos por el modelo que hemos entrenado, especificamos el parámetro `type = "class"`.
+
+argumento `type = "class` para 
+```{r}
+prediccion_1 <- predict(arbol_1, newdata = vino_prueba, type = "class")
+```
+
+Cruzamos la predicción con los datos reales de nuestro set de prueba para generar una matriz de confusión, usando `confusionMatrix()` de *caret*.
+```{r}
+confusionMatrix(prediccion_1, vino_prueba[["tipo"]])
+```
+atento McNemar's Test P-Value = NA aparece porque esta prueba no aplica para clasificación con más de 2 clases. No es un error, es una limitación lógica del test.
+
+
+
+
+
+**Vamos a trabajar con un conjunto de datos de una cartera de clientes de un banco.**
+
+Los datos están relacionados con campañas de marketing directo de una institución bancaria portuguesa. Las campañas de marketing se basaron en llamadas telefónicas. A menudo, se requería más de un contacto con el mismo cliente, para poder conocer si el producto estaría suscrito. El objetivo de la clasificación es predecir si un cliente, con un perfil determinado, suscribirá un depósito a plazo fijo.
+
+```{r}
+#install.packages("liver")
+library(liver)
+data("bank")
+bank
+```
+
+
+# Distribución de la variable objetivo
+
+Queremos saber cuantos casos hay en el conjunto de datos con clientes que fueron contactados y suscribieron a un depósito.
+
+```{r}
+prop.table(table(bank$deposit))
+```
+
+# Particionar el conjunto de datos
+
+Debemos dividir al conjunto de datos en dos. Con una parte (training) vamos a entrenar el modelo y obtener ciertos patrones que definen a los clientes con más chances de suscribir. La otra parte (testing) vamos a utilizarla para validar la veracidad de estos patrones o si estos son producto del azar o la casualidad.
+
+Vamos a seleccionar un 70% para entrenar y un 30% para testear.
+
+```{r}
+seleccionTest <- runif(n=nrow(bank))
+
+bank_test <- bank[seleccionTest >.7 ,    ]
+bank_tr <- bank[seleccionTest <= .7 ,    ] #Conjunto de entrenamiento sin balancear
+```
+
+Observamos como quedaron distribuidas las variables objetivos en el training y testing.
+
+```{r}
+#prop.table(table(bank_tr$deposit))
+prop.table(table(bank_test$deposit))
+table(bank_tr$deposit)
+```
+
+
+```{r}
+#install.packages("rpart")
+library(rpart)
+f <- "deposit ~ age + job + marital +
+education + default + balance + housing + loan +
+contact + day + month"
+
+```
+
+
+```{r}
+#library(rpart)
+t <- rpart(formula = deposit~., method = "class", data = bank_tr)
+```
+
+### Visualizamos el árbol / investigar como guardar el arbol - investigar graficos interactivos de arboles!!
+
+```{r}
+#install.packages("rpart.plot")
+library(rpart.plot)
+
+# Gráfico del árbol
+rpart.plot(t)
+
+```
+
+```{r}
+predArbol1_tr <- predict (t, newdata = bank_tr, type="prob")
+predArbol1_test <- predict (t, newdata = bank_test, type="prob")
+```
+
+### Matrices de confusión
+
+`
+```{r}
+
+# Paso 1: Clasificación binaria con umbral 0.5
+pred_clasif <- ifelse(predArbol1_tr[, "yes"] > 0.5, "yes", "no")
+
+# Paso 2: Convertir a factores con los mismos niveles que la variable real
+pred_clasif <- factor(pred_clasif, levels = c("no", "yes"))
+real <- factor(bank_tr$deposit, levels = c("no", "yes"))
+
+# Paso 3: Matriz de confusión y métricas
+confusion <- confusionMatrix(pred_clasif, real, positive = "yes")
+
+# Mostrar todo el resumen
+print(confusion)
+
+```
+
+
+Los típicos parámetros para manipular un árbol son:
+
+-   minsplit : mínimo numero de observaciones par dividir un nodo
+-   maxdepth : es la profundidad máxima del nodo
+-   minbucket : mínimo numero de observaciones de un nodo
+
+"cp" en RStudio se utiliza para controlar la complejidad del árbol de decisión mediante la poda, lo que ayuda a evitar el sobreajuste y mejorar la capacidad predictiva del modelo.
+
+### Definimos nuevos parámetros / ESTO POR FAVOR MIRAR EN AUTONOMIA!!!
+
+```{r}
+controles <- rpart.control(minsplit = 20, minbucket = 20, 
+                           cp =0.001, maxcompete = 4, 
+                           maxsurrogate = 5,
+                           usesurrogate = 2, 
+                           xval = 10,surrogatestyle = 0,
+                           maxdepth = 8)
+
+```
+
+
+```{r}
+#Quiero un árbol más frondoso
+#probar eliminar la variable month
+t <- rpart(formula = deposit~.-month, method = "class", 
+           data = bank_tr, control = controles)
+```
+
+#Les menciono metodo class porque los arboles pueden reconocer pero si usamos regresión es bueno decirle que es para una regresión
+
+
+```{r}
+# viasulaziation
+library(rpart.plot)
+
+# Abrir dispositivo PDF
+pdf("arbol_decision.pdf")
+
+# Gráfico del árbol
+rpart.plot(t)
+
+# Cerrar dispositivo PDF
+dev.off()
+```
+
+```{r}
+predArbol1_tr <- predict (t, newdata = bank_tr, type="prob")
+predArbol1_test <- predict (t, newdata = bank_test, type="prob")
+```
+
+
+
+
+```{r}
+# Clasificación binaria desde probabilidades con umbral 0.5
+pred_clasif <- ifelse(predArbol1_tr[, "yes"] > 0.5, "yes", "no")
+
+# Convertir en factor con niveles consistentes
+pred_clasif <- factor(pred_clasif, levels = c("no", "yes"))
+real <- factor(bank_tr$deposit, levels = c("no", "yes"))
+
+# Matriz de confusión y métricas completas
+confusion <- confusionMatrix(pred_clasif, real, positive = "yes")
+
+# Mostrar todo
+print(confusion)
+
+```
+
+
+# Valuación del modelo
+
+-   Costos Variables: 1000 AR\$ x contacto
+-   Ingresos: 2000 AR\$ x venta
+
+
+```{r}
+umbral<-0.5
+TP <- sum(predArbol1_test[, "yes"] > umbral & bank_test$deposit == "yes")
+FP <- sum(predArbol1_test[, "yes"] > umbral & bank_test$deposit == "no")
+FN <- sum(predArbol1_test[, "yes"] < umbral & bank_test$deposit == "yes")
+TN <- sum(predArbol1_test[, "yes"] < umbral & bank_test$deposit == "no")
+
+# O bien usando confusion$table:
+# confusion$table
+# #     Reference
+# # Pred   no yes
+# #   no   TN FN
+# #   yes  FP TP
+#
+# Ej. TP <- confusion$table["yes","yes"]
+
+```
+
+
+```{r}
+costo_contacto <- 100
+ingreso_venta  <- 3000
+
+contactos_realizados <- TP + FP  # Todos los casos predichos como "yes"
+Resultado <- ingreso_venta * TP - costo_contacto * contactos_realizados
+
+cat("Ganancia total = $", Resultado, "\n",
+    "Contactos realizados =", contactos_realizados, "\n",
+    "TP (Ventas efectivas) =", TP, "\n")
+
+```
+
+
+
+
+**Ahora primer desafio Balancear los yes para sean igual a los no, como daria el resultado de la campaña?** (/ )
+
+
+Segundo ejercicio
+# El objetivo de este análisis es predecir la especie de pingüino mediante arboles
+# (Adelie, Chinstrap o Gentoo) basándose en otras variables 
+# (como longitud del pico, longitud de la aleta, isla, sexo, etc.). ( )
+
+
+# 🌟 Interpretación del Código:
+
+- **`predArbol1_test[,2]`**:
+  - 📊 `predArbol1_test` es una matriz de probabilidades generada por el modelo de árbol de decisión (`rpart`) para los datos de prueba (`bank_test`).
+  - 🔢 El uso de `[ ,2]` selecciona todas las filas (`[ , ]`) de la **segunda columna** de esta matriz. La segunda columna representa la probabilidad de que la clase sea "yes" (que el cliente acepte el depósito) en tu modelo de clasificación binaria.
+  - 👉 Por lo tanto, `predArbol1_test[,2]` contiene todas las probabilidades de que cada cliente en el conjunto de prueba acepte el depósito.
+
+- **Cálculos de TP, FP, FN, TN**:
+  - 📈 Estos cálculos determinan los diferentes conteos necesarios para crear una matriz de confusión y evaluar el rendimiento del modelo.
+
+  - **TP (True Positives o Verdaderos Positivos):**  
+    ```r
+    TP <- sum(predArbol1_test[,2] > umbral & bank_test$deposit == "yes")
+    ```
+    ✔️ Aquí, `predArbol1_test[,2] > umbral` crea un vector lógico (TRUE o FALSE) indicando si la probabilidad predicha de la clase "yes" es mayor que el umbral especificado (0.5, en este caso).  
+    ➕ Al combinarlo con `bank_test$deposit == "yes"`, solo se cuenta como `TRUE` si ambos son verdaderos, es decir, si el modelo predice "yes" con una probabilidad mayor que el umbral **y** el valor real de `deposit` es "yes". La función `sum()` luego cuenta cuántos de estos casos son verdaderos, proporcionando el número de verdaderos positivos.
+
+  - **FP (False Positives o Falsos Positivos):**  
+    ```r
+    FP <- sum(predArbol1_test[,2] > umbral & bank_test$deposit == "no")
+    ```
+    ❌ Similar a `TP`, pero en este caso, se cuenta si la probabilidad predicha es mayor que el umbral (el modelo predice "yes") **pero** el valor real es "no". Esto proporciona el número de falsos positivos.
+
+  - **FN (False Negatives o Falsos Negativos):**  
+    ```r
+    FN <- sum(predArbol1_test[,2] < umbral & bank_test$deposit == "yes")
+    ```
+    🚫 Este cálculo cuenta los casos donde el modelo predice "no" (probabilidad menor que el umbral) **pero** el valor real es "yes", proporcionando el número de falsos negativos.
+
+  - **TN (True Negatives o Verdaderos Negativos):**  
+    ```r
+    TN <- sum(predArbol1_test[,2] < umbral & bank_test$deposit == "no")
+    ```
+    ✅ Finalmente, este cálculo cuenta los casos donde el modelo predice "no" (probabilidad menor que el umbral) **y** el valor real es "no", proporcionando el número de verdaderos negativos.
+
+# 🔍 **En Resumen**:
+- El uso de `[,2]` en `predArbol1_test[,2]` selecciona la segunda columna de la matriz de probabilidades de predicción, que corresponde a la probabilidad de la clase "yes". 
+- 📊 Los cálculos de TP, FP, FN, y TN dependen de comparar estas probabilidades con un umbral para clasificar las predicciones como verdaderas o falsas en relación con los valores reales de la variable objetivo (`deposit`).
+
+
+🔄¿Qué significa “balancear” las clases?
+Cuando una clase es mucho más frecuente que la otra, el modelo tiende a enfocarse en la mayoría y “olvida” la clase minoritaria, incluso si esa es la más importante para el negocio (por ejemplo, los clientes que dicen "sí" a una oferta).
+
+💡 Balancear significa:
+
+Modificar el conjunto de entrenamiento (no el real) para que el modelo aprenda mejor a reconocer ambas clases.
+
+Esto se hace con técnicas como:
+
+Upsampling: duplicar ejemplos de la clase minoritaria.
+
+Downsampling: reducir ejemplos de la clase mayoritaria.
+
+⚠️ NO se cambia el conjunto de prueba ni la realidad del negocio. Solo se entrena mejor.
+
+🎯 ¿Entonces es válido?
+Sí, totalmente válido y común en machine learning, siempre que:
+
+📊 No se altere el conjunto de prueba (que vos no lo hiciste).
+
+🧠 Se entienda que el balance es una técnica para mejorar el aprendizaje, no para “engañar” al modelo.
+
+💼 Se interprete como una estrategia para proponer mejoras reales en campañas futuras.
+
+💼 ¿Y cómo se comunica al cliente o stakeholder?
+
+es perfecto para una recomendación estratégica basada en simulación:
+
+"Si logramos identificar y priorizar mejor a los clientes tipo 'sí', por ejemplo ajustando la estrategia de contacto o diseñando campañas más dirigidas, el modelo muestra que podríamos aumentar las ventas hasta $285.900 en vez de $147.700."
+
+O bien:
+
+"Mediante técnicas de balanceo, entrenamos al modelo para prestar más atención a los clientes que suelen decir que sí. Esto mejora el recall y da una predicción más útil si el objetivo es maximizar ingresos."
