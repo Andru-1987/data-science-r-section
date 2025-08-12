@@ -1,0 +1,93 @@
+---
+title: "Análisis de Árbol de Decisión - Palmer Penguins"
+author: "Anderson Ocaña"
+date: "`r Sys.Date()`"
+output: 
+  # html_document:
+  #   toc: true
+  #   toc_float: true
+  #   theme: united
+  #   highlight: tango
+  #   code_folding: show
+  pdf_document:
+    toc: true
+    number_sections: true
+    highlight: tango
+fontsize: 10pt
+geometry: margin=1in
+---
+
+
+## 1. Instalación y carga de paquetes
+
+```{R install-packages, eval=FALSE}
+packages <- c("caret", "rpart", "palmerpenguins")
+install.packages(setdiff(packages, rownames(installed.packages())))
+```
+
+```{R load-libraries}
+library(caret)
+library(rpart)
+library(ggplot2)
+```
+
+## 2. Carga y preparación de datos
+
+```{R data-prep}
+data("penguins")
+
+# Convertir variables categóricas a factores
+penguins$species <- as.factor(penguins$species)
+penguins$island <- as.factor(penguins$island)
+penguins$sex <- as.factor(penguins$sex)
+
+# Eliminar filas con datos faltantes
+penguins <- penguins[complete.cases(penguins), ]
+
+# Mostrar estructura y resumen
+str(penguins)
+summary(penguins)
+```
+
+## 3. División en conjunto de entrenamiento y prueba
+
+```{R data-split}
+
+library(dplyr)
+library(tidymodels)
+set.seed(42)
+
+split <- initial_split(penguins, prop = 0.8, strata = species)  # acá ya estratificamos por categoría
+training_data <- training(split)
+testing_data <- testing(split)
+
+```
+
+## 4. Entrenar modelo árbol de decisión con caret
+
+```{R train-model}
+model <- train(
+  species ~ .,
+  data = training_data,
+  method = "rpart"
+)
+```
+
+## 5. Evaluar modelo y matriz de confusión
+
+```{R evaluate-model}
+predictions <- predict(model, newdata = testing_data)
+confusion_matrix <- confusionMatrix(predictions, testing_data$species)
+print(confusion_matrix)
+
+accuracy <- confusion_matrix$overall["Accuracy"]
+cat("Precisión (Accuracy): ", round(accuracy, 4), "\n")
+```
+
+## 6. Visualización del árbol de decisión
+
+```{R plot-tree, fig.width=7, fig.height=5}
+library(rpart.plot)
+rpart.plot(tree_model, main = "Árbol de Decisión - Palmer Penguins")
+
+```
