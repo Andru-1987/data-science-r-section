@@ -92,7 +92,6 @@ library(rpart.plot)
 library(caret)
 
 dt_model <- train(species ~ ., data = training_data, method = "rpart")
-dt_model <-  dt_model$finalModel
 ```
 
 
@@ -110,6 +109,6 @@ print(confusion_matrix)
 
 library(rpart.plot)
 class(dt_model)
-rpart.plot(dt_model, main="Arbol de decision")
+rpart.plot(dt_model$finalModel, main="Arbol de decision")
 
 ```
