@@ -1,0 +1,115 @@
+---
+title: "DT Pinguis!"
+output: 
+    html_document
+---
+
+```{R install-packs, eval= FALSE}
+packages <- c("caret", "rpart", "rpart.plot","palmerpenguins","dplyr", "ggplot2", "tidymodels")
+install.packages(setdiff(packages, rownames(installed.packages())))
+```
+
+
+```{R data-prep}
+library(dplyr)
+
+data("penguins")
+glimpse(penguins)
+summary(penguins)
+```
+
+```{R }
+penguins$sex <- as.factor(penguins$species)
+penguins$island <- as.factor(penguins$island)
+penguins$sex <- as.factor(penguins$sex)
+glimpse(penguins)
+```
+
+```{R charts}
+
+library(ggplot2)
+
+ggplot(
+    data = penguins,
+    aes(x= "islands", fill = sex)
+    ) +
+    geom_bar(position = "dodge") +
+      labs(
+    title = "Distribución de pingüinos por isla y sexo",
+    x = "Isla",
+    y = "Cantidad de pingüinos",
+  ) + theme_minimal()
+
+```
+
+rpart
+```{R nullish-chart}
+library(tidymodels)
+library(tidymodels)
+
+null_counting <- penguins %>%
+    summarise_all( ~ sum(is.na(.))) %>%
+    pivot_longer(everything(), names_to = "Variable", values_to = "ConteoNulls")
+
+
+ggplot(data = null_counting, aes(x = reorder(Variable, -ConteoNulls), y=ConteoNulls)) +
+geom_bar(stat="identity", fill="steelblue", linewidth=3)+
+theme_minimal()
+```
+
+```{R missing-values}
+
+penguins <- penguins %>%
+    drop_na()
+
+null_counting <- penguins %>%
+    summarise_all( ~ sum(is.na(.))) %>%
+    pivot_longer(everything(), names_to = "Variable", values_to = "ConteoNulls")
+
+
+ggplot(data = null_counting, aes(x = reorder(Variable, -ConteoNulls), y=ConteoNulls)) +
+geom_bar(stat="identity", fill="steelblue", linewidth=3)+
+theme_minimal()
+```
+
+
+
+```{R split-train-test}
+
+library(tidymodels)
+library(dplyr)
+
+split <- initial_split( penguins , prop = 0.8, strata  = species)
+
+training_data <- training(split)
+testing_data <- testing(split)
+
+```
+
+```{R training-ml}
+
+library(rpart.plot)
+library(caret)
+
+dt_model <- train(species ~ ., data = training_data, method = "rpart")
+dt_model <-  dt_model$finalModel
+```
+
+
+
+```{R evaluate-model-dt}
+predicts <- predict(model, newdata=testing_data)
+
+confusion_matrix <- confusionMatrix(predicts,testing_data$species)
+print(confusion_matrix)
+
+```
+
+
+```{R plot-tree}
+
+library(rpart.plot)
+class(dt_model)
+rpart.plot(dt_model, main="Arbol de decision")
+
+```

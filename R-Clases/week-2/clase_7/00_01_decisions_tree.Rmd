@@ -21,7 +21,7 @@ geometry: margin=1in
 ## 1. Instalación y carga de paquetes
 
 ```{R install-packages, eval=FALSE}
-packages <- c("caret", "rpart", "palmerpenguins")
+packages <- c("caret", "rpart","rpart.plot","palmerpenguins")
 install.packages(setdiff(packages, rownames(installed.packages())))
 ```
 
@@ -88,6 +88,6 @@ cat("Precisión (Accuracy): ", round(accuracy, 4), "\n")
 
 ```{R plot-tree, fig.width=7, fig.height=5}
 library(rpart.plot)
-rpart.plot(tree_model, main = "Árbol de Decisión - Palmer Penguins")
+rpart.plot(model$finalModel, main = "Árbol de Decisión - Palmer Penguins")
 
 ```
