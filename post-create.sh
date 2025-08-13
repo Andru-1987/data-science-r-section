@@ -22,7 +22,8 @@ install.packages(c(
   'rmarkdown', 
   'knitr', 
   'here', 
-  'tidyverse'
+  'tidyverse',
+  'tidymodels'
 ), repos='https://cloud.r-project.org')
 "
 
