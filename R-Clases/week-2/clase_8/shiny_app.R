@@ -16,7 +16,7 @@ df <- df %>% select(all_of(vars_input))
 df <- df %>% mutate(across(everything(), as.factor))
 
 ui <- fluidPage(
-  titlePanel("Predicción de HPV con modelos Naive Bayes y Bayes Logístico"),
+  titlePanel("Predicción de HPV- > Naive Bayes y Bayes Logístico"),
   
   sidebarLayout(
     sidebarPanel(
@@ -31,14 +31,14 @@ ui <- fluidPage(
       actionButton("predict", "Predecir")
     ),
     mainPanel(
-      h4("Predicción Naive Bayes:"),
+      h2("Predicción Naive Bayes:"),
       verbatimTextOutput("pred_nb"),
       h5("Probabilidades:"),
       tableOutput("prob_nb"),
       
       hr(),
-      
-      h4("Predicción Bayes Logístico:"),
+
+      h2("Predicción Bayes Logístico:"),
       verbatimTextOutput("pred_bayes"),
       h5("Probabilidades:"),
       tableOutput("prob_bayes")

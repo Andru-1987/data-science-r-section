@@ -17,7 +17,10 @@ fontsize: 10pt
 geometry: margin=1in
 ---
 
+### [Shiny](https://shiny.posit.co/)
+
 ```{R training}
+
 packages <- c("tictoc","naivebayes", "klaR","discrim","vip")
 install.packages(setdiff(packages, rownames(installed.packages())))
 ```
@@ -42,10 +45,20 @@ Al observar el dataset `BD_HPV.csv`, algunas columnas candidatas a ser la variab
 url <- "https://raw.githubusercontent.com/Andru-1987/csv_files_ds/refs/heads/main/BD_HPV.csv"
 df <- read_csv(url)
 
-head(df)
-glimpse(df)
+head(df, 10)
+glimpse(df) # str(df) -> es el analogo
+```
 
-cat("\nEstadistica de variables numericas\n")
+```{R estadistica-dataset}
+cat("\n Retiramos el id del dataframe \n")
+
+df <- df %>%
+    # pipe!
+      select(-ID)
+
+names(df)
+
+cat("\nEstadistica de variables cuantitativos\n")
 df %>%
     select(where(is.numeric)) %>%
     summary
@@ -53,10 +66,22 @@ df %>%
 cat("\nEstadistica de variables cualitativas\n")
 df %>%
     select(where( ~ !is.numeric(.))) %>%
-    mutate(across(everything(),as.factor)) %>%
+    # factor -> es una transformacion de un tipo de dato a uno categorico
+    mutate(across(everything(),  as.factor)) %>% 
     summary
 
+# estos pasos son iguales que el pipe
+# sin piping
+# df <- fn(df ....)
+# df <- xn(df ....)
 
+# con piping
+# df <- df %>% fn %>% xn
+
+
+```
+
+```{R distribucion-categoria}
 # Variable objetivo: Cat_HPV (valores: 1,2,3,4,5,6,7)
 cat("DISTRIBUCIÓN DE LA VARIABLE OBJETIVO (Cat_HPV):\n")
 table(df$Cat_HPV)
@@ -114,6 +139,9 @@ variable_ranking <- data.frame(
     )
   )
 
+# esto es lo que hace por detras el seleccionador de variables de peso
+# que afectan al modelo ... SelectBest
+
 print(variable_ranking)
 
 # ========================================
@@ -137,6 +165,9 @@ library(patchwork)
 
 df <- df %>%
   select(Cat_HPV, all_of(safe_vars))
+
+cat("\n DataFrame limpio\n")
+glimpse(df)
 
 null_counts <- df %>%
   summarise_all(~ sum(is.na(.))) %>%
@@ -207,6 +238,10 @@ test_data <- test_data %>%
 
 # 4. Especificación de modelos (sin hiperparámetros finos)
 ```{R modelos-selection}
+# analogo en R
+# RandoomForest()
+# LinearRegression()
+
 # Modelo Naive Bayes
 nb_spec <- naive_Bayes(smoothness = 1) %>%
   set_engine("naivebayes") %>%
@@ -223,13 +258,8 @@ bayes_spec <- naive_Bayes(smoothness = 1) %>%
 
 # 4.1 Workflows
 ```{R modelos-workflow}
-nb_wf <- workflow() %>%
-  add_model(nb_spec) %>%
-  add_formula(Cat_HPV ~ .)
-
-bayes_wf <- workflow() %>%
-  add_model(bayes_spec) %>%
-  add_formula(Cat_HPV ~ .)
+nb_wf <- workflow() %>% add_model(nb_spec) %>% add_formula(Cat_HPV ~ .)
+bayes_wf <- workflow() %>% add_model(bayes_spec) %>% add_formula(Cat_HPV ~ .)
 
 # tree_wf <- workflow() %>%
 #   add_model(tree_spec) %>%
@@ -239,16 +269,11 @@ bayes_wf <- workflow() %>%
 
 # 5. Entrenamiento
 
-
 ```{R training-dataset}
-library(tictoc)
-
 
 # tree_fit <- fit(tree_wf, data = train_data)
 nb_fit <- fit(nb_wf, data = train_data)
 bayes_fit <- fit(bayes_wf, data = train_data)
-
-
 ```
 
 ```{R save-model}

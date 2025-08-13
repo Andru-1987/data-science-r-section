@@ -94,10 +94,15 @@ library(caret)
 dt_model <- train(species ~ ., data = training_data, method = "rpart")
 ```
 
+```{R data-modeling}
+class(dt_model)
+names(dt_model) 
+```
+
 
 
 ```{R evaluate-model-dt}
-predicts <- predict(model, newdata=testing_data)
+predicts <- predict(dt_model, newdata=testing_data)
 
 confusion_matrix <- confusionMatrix(predicts,testing_data$species)
 print(confusion_matrix)
