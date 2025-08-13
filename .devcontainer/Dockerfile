@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y \
 
 # CAPA 5: Instalar Python (versión específica, cambia ocasionalmente)
 RUN apt-get update && apt-get install -y \
+    apt install libcurl4-openssl-dev libssl-dev libxml2-dev libfontconfig1-dev libcairo2-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev libharfbuzz-dev libfribidi-dev \
     python3 \
     python3-pip \
     python3-venv \

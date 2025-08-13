@@ -1,0 +1,391 @@
+---
+title: "Modelos de Random Forest y Desicion Tree"
+author: "Anderson Ocaña"
+date: "`r Sys.Date()`"
+output: 
+  # html_document:
+  #   toc: true
+  #   toc_float: true
+  #   theme: united
+  #   highlight: tango
+  #   code_folding: show
+  pdf_document:
+    toc: true
+    number_sections: true
+    highlight: tango
+fontsize: 10pt
+geometry: margin=1in
+---
+
+```{R training}
+packages <- c("tictoc","naivebayes", "klaR","discrim","vip")
+install.packages(setdiff(packages, rownames(installed.packages())))
+```
+
+```{R library-loading}
+library(tidyverse)
+library(discrim)
+library(tidymodels)
+library(vip)
+```
+
+## 1. ¿Cuál podría ser la variable a predecir?
+
+Al observar el dataset `BD_HPV.csv`, algunas columnas candidatas a ser la variable objetivo (de clasificación) serían:
+
+* **`Cat_HPV`**: Categoría relacionada con HPV (cáncer de cuello uterino?), con niveles como “No”, “ASCUS”, “L-SIL”, “H-SIL”.
+* **`Cat_PAP`**: Categoría del PAP (citología), también con niveles como “No”, “ASCUS”, “L-SIL”, “H-SIL”.
+
+# 1. Carga de datos
+
+```{R load-dataset}
+url <- "https://raw.githubusercontent.com/Andru-1987/csv_files_ds/refs/heads/main/BD_HPV.csv"
+df <- read_csv(url)
+
+head(df)
+glimpse(df)
+
+cat("\nEstadistica de variables numericas\n")
+df %>%
+    select(where(is.numeric)) %>%
+    summary
+
+cat("\nEstadistica de variables cualitativas\n")
+df %>%
+    select(where( ~ !is.numeric(.))) %>%
+    mutate(across(everything(),as.factor)) %>%
+    summary
+
+
+# Variable objetivo: Cat_HPV (valores: 1,2,3,4,5,6,7)
+cat("DISTRIBUCIÓN DE LA VARIABLE OBJETIVO (Cat_HPV):\n")
+table(df$Cat_HPV)
+prop.table(table(df$Cat_HPV)) * 100
+
+# ========================================
+# 2. ANÁLISIS DE DISTRIBUCIONES POR VARIABLE
+# ========================================
+
+# Función para analizar distribución de cada variable
+analyze_variable_distribution <- function(var_name) {
+  cat(paste("\n=== VARIABLE:", var_name, "===\n"))
+  
+  # Tabla cruzada con Cat_HPV
+  cross_table <- table(df[[var_name]], df$Cat_HPV)
+  print(cross_table)
+  
+  # Identificar celdas con 0 (problemas potenciales)
+  zero_cells <- which(cross_table == 0, arr.ind = TRUE)
+  if(nrow(zero_cells) > 0) {
+    cat("⚠️  CELDAS CON 0 (problemáticas):", nrow(zero_cells), "\n")
+  } else {
+    cat("✅ Sin celdas vacías\n")
+  }
+  
+  return(nrow(zero_cells))
+}
+
+# Analizar todas las variables
+variables <- names(df)[names(df) != "Cat_HPV"]
+zero_problems <- map_int(variables, analyze_variable_distribution)
+names(zero_problems) <- variables
+
+
+
+# ========================================
+# 3. RANKING DE VARIABLES (MENOS PROBLEMÁTICAS PRIMERO)
+# ========================================
+
+cat("\n", paste(rep("=", 50), collapse=""))
+cat("\nRANKING DE VARIABLES (ordenadas por problemas de celdas vacías):\n")
+cat(paste(rep("=", 50), collapse=""), "\n")
+
+variable_ranking <- data.frame(
+  Variable = names(zero_problems),
+  Celdas_Vacias = zero_problems
+) %>%
+  arrange(Celdas_Vacias) %>%
+  mutate(
+    Recomendacion = case_when(
+      Celdas_Vacias == 0 ~ "✅ EXCELENTE - Usar siempre",
+      Celdas_Vacias <= 5 ~ "✅ BUENA - Recomendada",
+      Celdas_Vacias <= 10 ~ "⚠️ MODERADA - Usar con cuidado", 
+      TRUE ~ "❌ PROBLEMÁTICA - Evitar"
+    )
+  )
+
+print(variable_ranking)
+
+# ========================================
+# 4. RECOMENDACIONES ESPECÍFICAS
+# ========================================
+
+cat("\n", paste(rep("=", 60), collapse=""))
+cat("\nRECOMENDACIONES ESPECÍFICAS:\n")
+cat(paste(rep("=", 60), collapse=""), "\n")
+
+# Variables más seguras (con menos de 5 celdas vacías)
+safe_vars <- subset(variable_ranking, Celdas_Vacias <= 5)$Variable
+print(safe_vars)
+```
+
+
+# 2. Preprocesamiento
+```{R preprocesamiento}
+library(ggplot2)
+library(patchwork)
+
+df <- df %>%
+  select(Cat_HPV, all_of(safe_vars))
+
+null_counts <- df %>%
+  summarise_all(~ sum(is.na(.))) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Null_Count")
+
+
+p3 <- ggplot(
+  data=null_counts,
+  aes(x = reorder(Variable, -Null_Count), y = Null_Count)) +
+
+  geom_bar(stat = "identity", fill = "steelblue", alpha = 0.7) +
+  geom_text(aes(label = Null_Count), vjust = -0.3, size = 3.5) +
+  labs(
+    title = "Cantidad de Valores Nulos por Variable",
+    subtitle = "Dataset: Insurance",
+    x = "Variables",
+    y = "Número de Valores Nulos"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 12)
+  )
+
+# Gráfico de barras
+p1 <- ggplot(df, aes(x = Cat_HPV), color=Cat_HPV) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5) +
+  labs(title = "Distribución de la Variable Objetivo (Cat_HPV)",
+       x = "Categoría HPV", y = "Frecuencia") +
+  theme_minimal()
+
+# Gráfico de proporciones
+p2 <- df %>%
+  count(Cat_HPV) %>%
+  mutate(prop = n / sum(n)) %>%
+  ggplot(aes(x = Cat_HPV, y = prop, fill = Cat_HPV)) +
+  geom_col() +
+  geom_text(aes(label = scales::percent(prop, accuracy = 0.1)), vjust = -0.5) +
+  labs(title = "Proporción por Categoría en Cat_HPV",
+       x = "Categoría HPV", y = "Proporción") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal()
+
+p1 + p2 / p3
+```
+
+# 3. División de los datos
+```{R data-splitting}
+set.seed(42)
+
+df <- df %>%
+  mutate(Cat_HPV = as.factor(Cat_HPV))
+
+split <- initial_split(df, prop = 0.75, strata = Cat_HPV)
+train_data <- training(split)
+test_data  <- testing(split)
+
+
+train_data <- train_data %>%
+  mutate(Cat_HPV = as.factor(Cat_HPV))
+
+test_data <- test_data %>%
+  mutate(Cat_HPV = as.factor(Cat_HPV))
+
+```
+
+# 4. Especificación de modelos (sin hiperparámetros finos)
+```{R modelos-selection}
+# Modelo Naive Bayes
+nb_spec <- naive_Bayes(smoothness = 1) %>%
+  set_engine("naivebayes") %>%
+  set_mode("classification")
+
+# Modelo Bayes (Regresión logística bayesiana con klaR)
+bayes_spec <- naive_Bayes(smoothness = 1) %>%
+  set_engine("klaR") %>%
+  set_mode("classification")
+
+# tree_spec <- decision_tree(mode = "classification", tree_depth = 5) %>%
+#   set_engine("rpart")
+```
+
+# 4.1 Workflows
+```{R modelos-workflow}
+nb_wf <- workflow() %>%
+  add_model(nb_spec) %>%
+  add_formula(Cat_HPV ~ .)
+
+bayes_wf <- workflow() %>%
+  add_model(bayes_spec) %>%
+  add_formula(Cat_HPV ~ .)
+
+# tree_wf <- workflow() %>%
+#   add_model(tree_spec) %>%
+#   add_formula(Cat_HPV ~ .)
+```
+
+
+# 5. Entrenamiento
+
+
+```{R training-dataset}
+library(tictoc)
+
+
+# tree_fit <- fit(tree_wf, data = train_data)
+nb_fit <- fit(nb_wf, data = train_data)
+bayes_fit <- fit(bayes_wf, data = train_data)
+
+
+```
+
+```{R save-model}
+# saveRDS(tree_fit, "./models/decision_tree.rds")
+saveRDS(nb_fit, "R-Clases/week-2/clase_8/models/nb_fit.rds")
+saveRDS(bayes_fit, "R-Clases/week-2/clase_8/models/bayes_fit.rds")
+```
+
+
+
+# 6. Predicciones
+```{R predictions}
+# pred_tree <- predict(tree_fit, test_data, type = "prob") %>%
+#   bind_cols(predict(tree_fit, test_data)) %>%
+#   bind_cols(test_data %>% select(Cat_HPV))
+
+pred_nb <- predict(nb_fit, test_data, type = "prob") %>%
+  bind_cols(predict(nb_fit, test_data)) %>%
+  bind_cols(test_data %>% select(Cat_HPV))
+
+pred_bayes <- predict(bayes_fit, test_data, type = "prob") %>%
+  bind_cols(predict(bayes_fit, test_data)) %>%
+  bind_cols(test_data %>% select(Cat_HPV))
+
+
+
+cat("📋 INSPECCIONANDO NOMBRES DE COLUMNAS:\n")
+cat("Nombres en pred_nb:\n")
+print(names(pred_nb))
+
+cat("\nNombres en pred_bayes:\n")
+print(names(pred_bayes))
+
+# Identificar columnas de probabilidad automáticamente
+prob_cols_nb <- names(pred_nb)[str_starts(names(pred_nb), "\\.pred_") & 
+                               !str_detect(names(pred_nb), "\\.pred_class")]
+
+prob_cols_bayes <- names(pred_bayes)[str_starts(names(pred_bayes), "\\.pred_") & 
+                                     !str_detect(names(pred_bayes), "\\.pred_class")]
+
+cat("\nColumnas de probabilidad NB:", paste(prob_cols_nb, collapse = ", "), "\n")
+cat("Columnas de probabilidad Bayes:", paste(prob_cols_bayes, collapse = ", "), "\n")
+
+
+```
+
+
+# 7. Métricas
+
+```{R metricas}
+cat(paste(rep("-", 40), collapse=""), "\n")
+
+# Calcular métricas macro (sin ROC-AUC primero)
+metrics_macro <- metric_set(accuracy, f_meas, precision, recall)
+
+nb_metrics_macro <- suppressWarnings(
+  metrics_macro(pred_nb, truth = Cat_HPV, estimate = .pred_class, estimator = "macro")
+)
+
+bayes_metrics_macro <- suppressWarnings(
+  metrics_macro(pred_bayes, truth = Cat_HPV, estimate = .pred_class, estimator = "macro")
+)
+
+# Calcular ROC-AUC por separado
+roc_nb <- suppressWarnings(
+  roc_auc(pred_nb, truth = Cat_HPV, !!!syms(prob_cols_nb), estimator = "hand_till")
+)
+
+roc_bayes <- suppressWarnings(
+  roc_auc(pred_bayes, truth = Cat_HPV, !!!syms(prob_cols_bayes), estimator = "hand_till")
+)
+
+# ✅ AGREGAR ROC-AUC AL FINAL DE CADA TIBBLE
+nb_metrics_complete <- bind_rows(nb_metrics_macro, roc_nb)
+bayes_metrics_complete <- bind_rows(bayes_metrics_macro, roc_bayes)
+
+# Crear comparación final
+metrics_comparison_complete <- left_join(
+  nb_metrics_complete %>% select(.metric, .estimate) %>% rename(Naive_Bayes = .estimate),
+  bayes_metrics_complete %>% select(.metric, .estimate) %>% rename(Bayes_Logistic = .estimate),
+  by = ".metric"
+)
+
+cat("RESULTADO CON ROC-AUC AGREGADO:\n")
+print(metrics_comparison_complete)
+```
+
+
+# 8. Matriz de confusión
+
+```{R matrix-confusion}
+library(yardstick)
+
+# Matriz de confusión NB
+conf_mat_nb <- conf_mat(pred_nb, truth = Cat_HPV, estimate = .pred_class)
+print(conf_mat_nb)
+autoplot(conf_mat_nb, type = "heatmap") + ggtitle("Matriz de Confusión - Naive Bayes")
+
+# Matriz de confusión Bayes (klaR)
+conf_mat_bayes <- conf_mat(pred_bayes, truth = Cat_HPV, estimate = .pred_class)
+print(conf_mat_bayes)
+autoplot(conf_mat_bayes, type = "heatmap") + ggtitle("Matriz de Confusión - Bayes Logístico")
+
+
+```
+
+
+# 9. Curvas ROC
+```{R curva-roc}
+library(patchwork)
+
+p_nb <- autoplot(roc_nb_curves) + ggtitle("Curvas ROC - Naive Bayes")
+p_bayes <- autoplot(roc_bayes_curves) + ggtitle("Curvas ROC - Bayes Logístico")
+
+# Juntarlos lado a lado
+p_nb + p_bayes + plot_layout(ncol = 2)
+
+```
+
+
+## Explicación rápida
+
+* **metric\_set()** → permite calcular varias métricas a la vez.
+* **accuracy** → % de aciertos.
+* **f\_meas** → F1 Score (balance entre precision y recall).
+* **precision** → Proporción de positivos predichos que realmente son positivos.
+* **recall** → Proporción de positivos reales que fueron detectados.
+* **roc\_auc** → Medida de discriminación entre clases (usamos `macro_weighted` para multiclase).
+* **conf\_mat()** → Matriz de confusión para ver errores y aciertos por clase.
+* **roc\_curve() + autoplot()** → Curvas ROC por clase.
+
+---
+
+## Conclusion del modelo
+
+* **Random Forest** tiende a superar al árbol simple en accuracy, F1 y ROC AUC.
+* El árbol de decisión es más interpretable, pero menos potente.
+* Si tu prioridad es **mejor rendimiento predictivo**, elijo **Random Forest**.
+* Si tu prioridad es **interpretabilidad y reglas claras**, elijo **Árbol de Decisión**.
+
