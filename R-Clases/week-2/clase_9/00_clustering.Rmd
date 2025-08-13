@@ -1,3 +1,65 @@
 # [Clustering Kmeans Wines](https://domino.ai/blog/clustering-in-r)
 
 # Challenge del desafio final -> Enunciado final
+```{R import-librerias}
+wineUrl <- 'http://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data'
+column_names <- c('Cultivo', 'Alcohol', 'Malic.acid','Ash', 'Alcalinity.of.ash','Magnesium', 'Total.phenols','Flavanoids', 'Nonflavanoid.phenols','Proanthocyanin', 'Color.intensity','Hue', 'OD280.OD315.of.diluted.wines','Proline')
+# retiramos la columna Cultivo -> pues es el campo que nos va a dar su sector o segmento.
+wine_raw <- read.table(wineUrl, header=FALSE, sep=',', stringsAsFactors=FALSE, col.names=column_names) %>% as_tibble()
+
+# Separar target y features
+wine_target <- wine_raw %>% select(Cultivo)
+wine_features <- wine_raw %>% select(-Cultivo)
+
+glimpse(wine_raw)
+write.csv(wine_raw, "wine.data.csv")
+```
+## Conteo de nulls
+```{R}
+# Conteo de valores NA por columna
+na_counts <- sapply(wine_features, function(x) sum(is.na(x)))
+
+# Mostrar como tibble
+na_counts_tbl <- tibble(Columna = names(na_counts), NA_Count = as.integer(na_counts))
+na_counts_tbl
+```
+```{R}
+
+library(tidymodels)
+library(broom)
+library(dplyr)
+
+# 1. Preparar los datos
+set.seed(42)
+wine_split <- initial_split(wine_features, prop = 0.8)
+wine_train <- training(wine_split)
+
+# 2. Preprocesamiento con recipe
+wine_recipe <- recipe(~ ., data = wine_train) %>%
+  step_normalize(all_predictors())
+
+# 3. Preparar los datos procesados
+prep_wine <- prep(wine_recipe)
+wine_train_prepped <- bake(prep_wine, new_data = NULL)
+
+# 4. Aplicar k-means directamente
+kmeans_model <- kmeans(wine_train_prepped, centers = 3)
+
+# 5. Extraer resultados tidy
+kmeans_tidy <- tidy(kmeans_model)       # centros
+kmeans_glance <- glance(kmeans_model)   # métricas
+kmeans_augmented <- augment(kmeans_model, wine_train_prepped)  # asignaciones
+
+# 6. Añadir cluster al dataset original
+wine_clustered <- wine_train %>%
+  bind_cols(cluster = kmeans_augmented$.cluster)
+
+```
+```{R}
+```
+```{R}
+```
+```{R}
+```
+```{R}
+```
