@@ -1,0 +1,208 @@
+---
+title: "Clustering de Vinos con KMeans y GMM"
+author: "Anderson Ocaña"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{R setup, message=FALSE, warning=FALSE}
+# Función para instalar y cargar paquetes
+
+load_packages <- c("tidyverse", "tidymodels", "cluster", "factoextra", "mclust", "plotly", "broom", "recipes", "flexclust","factoextra","fossil","vip","themis")
+install.packages(setdiff(load_packages,installed.packages()))
+````
+
+## 1. Carga de datos
+```{R import-dependencies}
+library(tidyverse)
+library(tidymodels)
+library(cluster)
+library(factoextra)
+library(recipes)
+library(plotly)
+library(mclust)
+library(flexclust)
+library(patchwork)  
+library(fossil)
+library(tibble) 
+```
+- *[Clustering Kmeans Wines](https://domino.ai/blog/clustering-in-r)*
+
+
+```{R}
+wine_url <- "http://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data"
+column_names <- c("Cultivo", "Alcohol", "Malic.acid", "Ash", "Alcalinity.of.ash", 
+                  "Magnesium", "Total.phenols", "Flavanoids", "Nonflavanoid.phenols", 
+                  "Proanthocyanin", "Color.intensity", "Hue", 
+                  "OD280.OD315.of.diluted.wines", "Proline")
+
+wine <- read.table(wine_url, header = FALSE, sep = ",", stringsAsFactors = FALSE, 
+                   col.names = column_names) %>% as_tibble()
+
+glimpse(wine)
+```
+
+## 2. Preprocesamiento con recipes
+
+```{R}
+wine_recipe <- recipe(~ ., data = wine %>% 
+    select(-Cultivo)) %>%
+    step_normalize(all_predictors()) %>%
+    step_pca(all_predictors(), num_comp = 3)
+
+    wine_prep <- prep(wine_recipe)
+    pca_data <- bake(wine_prep, new_data = NULL)
+
+```
+
+## 3. Selección del número óptimo de clusters
+
+```{R}
+elbow <- fviz_nbclust(pca_data, kmeans, method = "wss") + 
+  labs(title = "Método del Codo (WSS)")
+
+silhouette_viz <- fviz_nbclust(pca_data, kmeans, method = "silhouette") + 
+  labs(title = "Método de Silhouette")
+
+elbow / silhouette_viz
+```
+
+## 4. KMeans con 3 clusters
+
+```{R}
+set.seed(42)
+kmeans_model <- kmeans(pca_data, centers = 3)
+
+sil_kmeans <- silhouette(kmeans_model$cluster, dist(pca_data))
+fviz_silhouette(sil_kmeans) + labs(title = "Silhouette KMeans")
+```
+
+## 5. GMM con 3 clusters
+
+```{R}
+gmm_model <- Mclust(pca_data, G = 3)
+
+sil_gmm <- silhouette(gmm_model$classification, dist(pca_data))
+fviz_silhouette(sil_gmm) + labs(title = "Silhouette GMM")
+```
+
+## 6. Comparación con etiquetas reales (ARI)
+
+## ¿Qué es el ARI (Adjusted Rand Index)?
+
+El **Adjusted Rand Index (ARI)** es una métrica para evaluar la calidad de algoritmos de *clustering* cuando se conocen las etiquetas verdaderas (*ground truth*).  
+Es especialmente útil para comparar qué tan bien diferentes algoritmos recuperan la estructura real de los datos.
+
+### Características del ARI
+
+- **Rango:** de -1 a 1  
+- **Interpretación:**
+  - `1` → Clustering perfecto (idéntico a las etiquetas verdaderas)  
+  - `0` → Clustering equivalente al azar  
+  - Valores negativos → Peor que el azar  
+
+- **Ajustado por casualidad:** corrige el índice de Rand original para que el valor esperado sea `0` cuando el clustering es aleatorio.
+
+```{R}
+ari_kmeans <- randIndex(kmeans_model$cluster, wine$Cultivo, correct = TRUE)
+ari_gmm <- randIndex(gmm_model$classification, wine$Cultivo, correct = TRUE)
+
+tibble(Modelo = c("KMeans", "GMM"), ARI = c(ari_kmeans, ari_gmm))
+```
+
+## 7. Visualización 3D comparativa
+
+```{R}
+pca_data$cluster_kmeans <- as.factor(kmeans_model$cluster)
+pca_data$cluster_gmm <- as.factor(gmm_model$classification)
+
+# KMeans
+plot_kmeans <- ggplot(pca_data, aes(x = PC1, y = PC2, color = cluster_kmeans)) +
+  geom_point(alpha = 0.7, size = 2) +
+  scale_color_viridis_d(option = "viridis") +
+  labs(title = "KMeans Clustering (PCA 2D)", color = "Cluster") +
+  theme_minimal()
+
+# GMM
+plot_gmm <- ggplot(pca_data, aes(x = PC1, y = PC2, color = cluster_gmm)) +
+  geom_point(alpha = 0.7, size = 2) +
+  scale_color_viridis_d(option = "inferno") +
+  labs(title = "GMM Clustering (PCA 2D)", color = "Cluster") +
+  theme_minimal()
+
+
+plot_kmeans / plot_gmm 
+```
+
+
+```{R subplot-3d}
+library(plotly)
+library(viridis)
+
+# Añadir clusters
+pca_data$cluster_kmeans <- as.factor(kmeans_model$cluster)
+pca_data$cluster_gmm <- as.factor(gmm_model$classification)
+
+# Crear trazas (inicialmente GMM oculto)
+fig <- plot_ly(type = "scatter3d", mode = "markers") %>%
+  
+  # Traza KMeans
+  add_trace(
+    data = pca_data,
+    x = ~PC1, y = ~PC2, z = ~PC3,
+    color = ~cluster_kmeans,
+    colors = viridis(3),
+    visible = TRUE,
+    name = "KMeans"
+  ) %>%
+  
+  # Traza GMM
+  add_trace(
+    data = pca_data,
+    x = ~PC1, y = ~PC2, z = ~PC3,
+    color = ~cluster_gmm,
+    colors = inferno(3),
+    visible = FALSE,
+    name = "GMM"
+  ) %>%
+  
+  # Menú interactivo para elegir modelo
+  layout(
+    title = "Comparación Clustering PCA 3D",
+    updatemenus = list(
+      list(
+        type = "buttons",
+        direction = "right",
+        x = 0.1, y = 1.1,
+        buttons = list(
+          list(
+            label = "KMeans",
+            method = "update",
+            args = list(list(visible = c(TRUE, FALSE)))
+          ),
+          list(
+            label = "GMM",
+            method = "update",
+            args = list(list(visible = c(FALSE, TRUE)))
+          )
+        )
+      )
+    )
+  )
+
+fig
+
+
+```
+## 8. Guardado de modelos y preprocesamiento
+
+```{R}
+dir.create("R-Clases/week-2/clase_9/models", showWarnings = FALSE, recursive = TRUE)
+
+saveRDS(kmeans_model, "R-Clases/week-2/clase_9/models/modelo_kmeans.rds")
+saveRDS(gmm_model, "R-Clases/week-2/clase_9/models/modelo_gmm.rds")
+saveRDS(wine_prep, "R-Clases/week-2/clase_9/models/preprocesamiento_pca.rds")
+
+```
+

@@ -1,0 +1,212 @@
+---
+title: "Random Forest Loan"
+author: "Anderson Ocaña"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{R setup, include=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(themis)
+set.seed(42)
+```
+
+## 1. Cargar datos
+
+```{R}
+loan_data <- read_csv("R-Clases/week-2/clase_9/storage/loan_status.csv")
+
+# Asegurar que Loan_Status sea factor
+loan_data <- loan_data %>%
+  select(-Loan_ID) %>%                                 # Quitar columna Loan_ID
+  mutate(across(where(~!is.numeric(.)), as.factor)) %>% # Convertir no-numéricas a factor
+  drop_na()                                            # Eliminar filas con NA
+
+
+glimpse(loan_data)
+```
+
+```{R target-variable}
+library(ggplot2)
+library(dplyr)
+
+# Contar cantidad de cada clase
+target_counts <- loan_data %>%
+  count(Loan_Status) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Doughnut chart
+ggplot(target_counts, aes(x = 2, y = n, fill = Loan_Status)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar(theta = "y") +       # Convierte a gráfico circular
+  xlim(0.5, 2.5) +                 # Hace el agujero central
+  geom_text(aes(label = paste0(n, " (", round(percentage, 1), "%)")),
+            position = position_stack(vjust = 0.5)) +
+  theme_void() +
+  ggtitle("Distribución de Loan_Status") +
+  theme(legend.position = "right")
+
+```
+
+
+## 2. Dividir train/test
+
+```{R}
+split <- initial_split(loan_data, prop = 0.8, strata = Loan_Status)
+train_data <- training(split)
+test_data <- testing(split)
+```
+
+## 3. Crear recipe para preprocesamiento
+
+```{R}
+loan_recipe <-
+    recipe(Loan_Status ~ ., data = train_data) %>%
+    step_impute_median(all_numeric_predictors()) %>%    # Imputar NA numéricas
+    step_impute_mode(all_nominal_predictors()) %>%     # Imputar NA categóricas
+    step_dummy(all_nominal_predictors()) %>%           # Convertir factores a dummies
+    step_zv(all_predictors()) %>%                          # Eliminar variables con varianza cero
+    step_upsample(Loan_Status)   # rebalancea clases
+```
+
+```{R check-resampling}
+
+# Prepara el recipe
+loan_recipe_prep <- prep(loan_recipe)
+
+# Obtener el dataset balanceado (tras upsample)
+train_balanced <- juice(loan_recipe_prep)
+
+# Ver porcentaje de cada clase
+train_balanced %>%
+  count(Loan_Status) %>%
+  mutate(percentage = n / sum(n) * 100)
+```
+
+## 4. Definir modelo Random Forest
+
+```{R}
+library(dials)
+
+rf_model <- rand_forest(
+  mtry = tune(),    # <-- ahora sí se puede optimizar
+  trees = 2000,
+  min_n = tune()    # <-- optimizable
+) %>%
+  set_engine("ranger", importance = "impurity") %>%
+  set_mode("classification")
+
+```
+
+## 5. Crear workflow
+
+```{R}
+rf_workflow <- workflow() %>%
+  add_recipe(loan_recipe) %>%
+  add_model(rf_model)
+```
+
+## 6. Cross-validation
+
+```{R}
+# Definir cross-validation
+library(dials)
+
+cv_folds <- vfold_cv(train_data, v = 5, strata = Loan_Status)
+
+rf_grid <- grid_random(
+  mtry(range = c(1, ncol(train_data) - 1)),
+  min_n(range = c(2, 10)),
+  size = 10
+)
+
+
+# Tuning con metricas ROC AUC
+rf_tune <- tune_grid(
+  rf_workflow,
+  resamples = cv_folds,
+  grid = rf_grid,
+  metrics = metric_set(roc_auc, accuracy, f_meas, precision)
+)
+
+# Ver resultados del tuning
+rf_tune %>% collect_metrics() %>% arrange(desc(mean))
+rf_tune
+
+```
+
+## 7. Seleccionar mejor modelo y entrenar final
+
+```{R}
+# Seleccionar mejores parámetros según ROC AUC
+best_params <- select_best(rf_tune, metric = "roc_auc")
+
+# Finalizar workflow con los mejores parámetros y entrenar
+final_rf <- finalize_workflow(rf_workflow, best_params) %>%
+  fit(data = train_data)
+
+final_rf
+
+```
+
+## 8. Evaluar en test set
+
+```{R}
+# Definir clase positiva
+positive_class <- "Y"
+
+# Predecir probabilidades sobre test set
+rf_pred <- predict(final_rf, test_data, type = "prob") %>%
+  bind_cols(test_data %>% select(Loan_Status))
+
+rf_pred
+```
+
+## 8b. Calcular métricas adicionales sobre test set
+
+```{R}
+# Cargar metrics set
+metrics_set <- metric_set(accuracy, f_meas, precision, recall)
+
+# Obtener predicciones de clase
+threshold <- 0.4  # prueba 0.3, 0.4, 0.5
+rf_pred <- predict(final_rf, test_data, type = "prob") %>%
+  bind_cols(test_data %>% select(Loan_Status)) %>%
+  mutate(.pred_class = factor(ifelse(.pred_Y > threshold, "Y", "N")))
+
+# Calcular métricas
+rf_metrics <- metrics_set(rf_pred, truth = Loan_Status, estimate = .pred_class)
+rf_metrics
+
+```
+
+
+## 9. Gráfico ROC
+
+```{R}
+positive_class <- "Y"  # o "1"
+pred_col <- paste0(".pred_", positive_class)
+
+rf_pred %>%
+  roc_curve(truth = Loan_Status, !!sym(pred_col)) %>%
+  autoplot() +
+  ggtitle("ROC Curve - Random Forest") +
+  theme_minimal()
+```
+
+## 10. Importancia de variables
+
+```{R}
+library(vip)
+
+final_rf %>%
+  extract_fit_parsnip() %>%
+  vip::vip()
+```
+
+Credit_History ,
+ApplicantIncome
+LoanAmount
+CoapplicantIncome
