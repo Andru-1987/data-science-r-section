@@ -1,0 +1,221 @@
+---
+title: "Clas en vivo de Clustering"
+author: "Anderson Ocaña"
+date: "`r Sys.Date()`"
+output: html_document
+---
+```{R dataset-loading}
+library(tidyverse)
+library(tidymodels)
+library(dplyr)
+library(factoextra)
+library(patchwork)
+library(cluster)
+library(mclust)
+library(flexclust)
+```
+
+```{R dataset-loading}
+wineUrl <- 'http://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data'
+column_names <- c('Cultivo', 'Alcohol', 'Malic.acid',
+                   'Ash', 'Alcalinity.of.ash',
+                   'Magnesium', 'Total.phenols',
+                   'Flavanoids', 'Nonflavanoid.phenols',
+                   'Proanthocyanin', 'Color.intensity',
+                   'Hue', 'OD280.OD315.of.diluted.wines',
+                   'Proline')
+
+wine <- read.csv( wineUrl , sep=",", col.names = column_names) 
+wine <- wine  %>% mutate(Cultivo = factor(Cultivo))
+
+glimpse(wine)
+
+total_nas <- sum(is.na(wine))
+cat( "Total columnas nulas \t:",total_nas)
+```
+
+```{R grupos-de-cultivo}
+library(ggplot2)
+
+# Suponiendo que 'wine' es tu dataframe y 'Cultivo' es una variable categórica
+ggplot(wine, aes(x = Cultivo, fill = Cultivo, color = Cultivo)) +
+  geom_bar() +
+  labs(
+    title = "Distribución de Cultivos",
+    x = "Tipo de Cultivo",
+    y = "Frecuencia"
+  ) +
+  scale_fill_discrete(name = "Cultivo", labels = levels(wine$Cultivo)) +  # Leyenda para fill
+  scale_color_discrete(guide = "none") +  # Ocultar leyenda de color (opcional)
+  theme_minimal() +
+  theme(legend.position = "right")  # Posición de la leyenda (top, bottom, left, right, none)
+```
+
+
+```{R}
+summary(wine)
+```
+
+```{R}
+wine_recipe <- recipe(~ ., data = wine %>% select(-Cultivo))  %>%
+    step_normalize(all_predictors()) %>%
+    step_pca(all_predictors(), num_comp = 2)
+
+wine_prep <- prep(wine_recipe)
+pca_data <-  bake(wine_prep, new_data = NULL)
+pca_data$Cultivo <- wine$Cultivo
+
+# # Gráfico de dispersión PCA con colores por Cultivo
+ggplot(pca_data, aes(x = PC1, y = PC2, color = Cultivo)) +
+  geom_point(size = 3, alpha = 0.8) +  # Puntos más grandes y semi-transparentes
+  labs(
+    title = "Análisis de Componentes Principales (PCA) - Vinos por Cultivo",
+    x = "Primer Componente Principal (PC1)",
+    y = "Segundo Componente Principal (PC2)",
+    color = "Tipo de Cultivo"
+  ) +
+  scale_color_brewer(palette = "Set1") +  # Paleta de colores atractivos
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  ) +
+  # Opcional: Añadir elipses de confianza al 95% para cada grupo
+  stat_ellipse(level = 0.95, linetype = 2)
+
+```
+
+
+```{R elbow-silho}
+
+
+elbow <- fviz_nbclust(pca_data %>% select(-Cultivo), kmeans, method="wss") + labs(title = "Metodo del Codo WSS")
+
+silho <- fviz_nbclust(pca_data %>% select(-Cultivo), kmeans, method="silhouette") + labs(title = "Metodo de la silhouette ")
+
+elbow / silho
+
+```
+
+
+```{R kmeans}
+
+# Assuming `pca_data` contains only numeric PCA components (PC1, PC2, ...)
+data_cleaned <- pca_data %>% select(where(is.numeric))  # Ensure only numeric columns
+
+# Perform K-means clustering
+kmeans_model <- kmeans(data_cleaned, centers = 3)
+
+# Compute silhouette scores
+dist_matrix <- dist(data_cleaned)  # Euclidean distance matrix
+sil_kmeans <- silhouette(kmeans_model$cluster, dist_matrix)  # Use $cluster (not $Cluster)
+
+# Plot silhouette
+plot_kmeans <- fviz_silhouette(sil_kmeans) + 
+  labs(title = "Silhouette Plot for K-Means (k=3)") +
+  theme_minimal()
+
+gmm_model <- Mclust(data_cleaned, G = 3)
+
+# Compute silhouette scores
+sil_gmm <- silhouette(gmm_model$classification, dist_matrix)  # Use $cluster (not $Cluster)
+
+# Plot silhouette
+plot_gmm <- fviz_silhouette(sil_gmm) + 
+  labs(title = "Silhouette Plot for K-Means (k=3)") +
+  theme_minimal()
+
+
+plot_kmeans / plot_gmm
+
+```
+
+```{R ari-validacion}
+
+ari_kmeans <- randIndex( kmeans_model$cluster, wine$Cultivo, correct = TRUE)
+ari_gmm <- randIndex( gmm_model$classification, wine$Cultivo, correct = TRUE)
+
+tibble(Model=c("KMeans", "GMM"), ARI=c(ari_kmeans, ari_gmm))
+```
+
+
+
+```{R plotting-3d}
+
+library(plotly)
+library(viridis)
+
+wine_recipe <- recipe(~ ., data = wine %>% select(-Cultivo))  %>%
+    step_normalize(all_predictors()) %>%
+    step_pca(all_predictors(), num_comp = 3)
+
+wine_prep <- prep(wine_recipe)
+pca_data <-  bake(wine_prep, new_data = NULL)
+pca_data$Cultivo <- wine$Cultivo
+
+# Añadir clusters
+pca_data$cluster_kmeans <- as.factor(kmeans_model$cluster)
+pca_data$cluster_gmm <- as.factor(gmm_model$classification)
+
+# Crear trazas (inicialmente GMM oculto)
+fig <- plot_ly(type = "scatter3d", mode = "markers") %>%
+  
+  # Traza KMeans
+  add_trace(
+    data = pca_data,
+    x = ~PC1, y = ~PC2, z = ~PC3,
+    color = ~cluster_kmeans,
+    colors = viridis(3),
+    visible = TRUE,
+    name = "KMeans"
+  ) %>%
+  
+  # Traza GMM
+  add_trace(
+    data = pca_data,
+    x = ~PC1, y = ~PC2, z = ~PC3,
+    color = ~cluster_gmm,
+    colors = inferno(3),
+    visible = FALSE,
+    name = "GMM"
+  ) %>%
+  
+  # Menú interactivo para elegir modelo
+  layout(
+    title = "Comparación Clustering PCA 3D",
+    updatemenus = list(
+      list(
+        type = "buttons",
+        direction = "right",
+        x = 0.1, y = 1.1,
+        buttons = list(
+          list(
+            label = "KMeans",
+            method = "update",
+            args = list(list(visible = c(TRUE, FALSE)))
+          ),
+          list(
+            label = "GMM",
+            method = "update",
+            args = list(list(visible = c(FALSE, TRUE)))
+          )
+        )
+      )
+    )
+  )
+
+fig
+
+```
+
+
+
+
+```{R}
+dir.create("R-Clases/week-2/clase_9/models", showWarnings = FALSE, recursive = TRUE)
+
+saveRDS(kmeans_model, "R-Clases/week-2/clase_9/models/modelo_kmeans.rds")
+saveRDS(gmm_model, "R-Clases/week-2/clase_9/models/modelo_gmm.rds")
+saveRDS(wine_prep, "R-Clases/week-2/clase_9/models/preprocesamiento_pca.rds")
+
+```
