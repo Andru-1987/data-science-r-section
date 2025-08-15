@@ -1,0 +1,271 @@
+Challenge de R
+
+- Hacer un  analisis sobre un dataset de prestamos para la base de datos creada de un banco.
+La query que vamos a utilizar sera la siguiente:
+
+
+data original:
+
+## Diccionario de variables
+
+| Columna       | Tipo                        | Descripción                                                                | Posible uso en análisis de préstamos                                                                             |
+| ------------- | --------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **id**        | Numérico (entero)           | Identificador único del registro/persona.                                  | No aporta información para el riesgo, pero sirve para trazabilidad.                                              |
+| **age**       | Numérico (entero)           | Edad del cliente.                                                          | Importante para segmentar riesgo: clientes muy jóvenes o muy mayores pueden tener perfiles de ingreso distintos. |
+| **job**       | Categórica (texto)          | Ocupación del cliente (p. ej. technician, blue-collar, admin., student).   | Determina estabilidad laboral e ingresos estimados.                                                              |
+| **marital**   | Categórica (texto)          | Estado civil (single, married, divorced).                                  | Puede influir en responsabilidad financiera y carga familiar.                                                    |
+| **education** | Categórica (texto)          | Nivel educativo (primary, secondary, tertiary, etc.).                      | Relacionado con empleabilidad y potencial de ingresos.                                                           |
+| **has_default**   | Categórica (texto)          | Si el cliente ha estado en default previamente (yes/no).                   | Indicador crítico de riesgo.                                                                                     |
+| **balance**   | Numérico (entero)           | Saldo promedio en la cuenta bancaria.                                      | Mide capacidad de ahorro y liquidez.                                                                             |
+| **housing**   | Categórica (texto)          | Si tiene un préstamo hipotecario (yes/no).                                 | Puede ser signo de estabilidad o carga financiera adicional.                                                     |
+| **loan**      | Categórica (texto)          | Si tiene un préstamo personal (yes/no).                                    | Puede indicar endeudamiento previo.                                                                              |
+| **contact**   | Categórica (texto)          | Medio de contacto (cellular, telephone, unknown).                          | No influye directamente en riesgo, pero sí en campañas.                                                          |
+| **day**       | Numérico (entero)           | Día del mes en que se realizó el último contacto.                          | Más útil en marketing que en scoring crediticio.                                                                 |
+| **month**     | Categórica (texto)          | Mes del último contacto.                                                   | Igual que `day`, más relacionado con estacionalidad de campañas.                                                 |
+| **duration**  | Numérico (entero, segundos) | Duración de la última llamada.                                             | Puede ser proxy de interés del cliente en la oferta.                                                             |
+| **campaign**  | Numérico (entero)           | Número de contactos realizados durante la campaña actual.                  | Puede indicar persistencia o resistencia del cliente.                                                            |
+| **pdays**     | Numérico (entero)           | Días desde el último contacto previo a la campaña (-1 si no hubo).         | Mide la recencia del contacto.                                                                                   |
+| **previous**  | Numérico (entero)           | Número de contactos previos antes de la campaña actual.                    | Puede indicar historial de interacción.                                                                          |
+| **poutcome**  | Categórica (texto)          | Resultado de la campaña de marketing previa (success, failure, unknown).   | Puede correlacionar con predisposición a aceptar ofertas.                                                        |
+| **y**         | Binaria (0/1)               | Variable objetivo: si el cliente aceptó (1) o no (0) el préstamo/depósito. | Target de un modelo de clasificación.                                                                            |
+
+---
+
+
+Objetivo: 
+Hacer un modelo que me permita si el cliente con las caracteristicas principales va a tener propension a un riesgo crediticio o modelo de scoring
+
+- un modelo que nos otorge un valor de propension a riesgo crediticio -> el score
+- un modelo que nos diga si es riesgoso o no.
+
+
+* Muy relevantes: `age`, `job`, `education`, `"default"`, `balance`, `housing`, `loan`.
+* Moderadas: `marital`, `poutcome`.
+* Poca relevancia directa: `contact`, `day`, `month`, `campaign`, `duration` (más marketing que scoring).
+
+
+```{R install-dependencies}
+# Instalar paquetes si no los tienes
+packages <- c("DBI", "RSQLite", "dplyr", "tidymodels","reshape2","DataExplorer", "skimr","patchwork","themis","ranger")
+install.packages(setdiff(packages,installed.packages()))
+```
+
+```{R load-dependecies}
+# Cargar librerías
+library(DBI)
+library(RSQLite)
+library(dplyr)
+library(tidymodels)
+library(skimr)
+library(DataExplorer)
+library(patchwork)
+library(themis)
+```
+
+```{R load-data}
+# Conectarse a la base de datos SQLite
+con <- dbConnect(RSQLite::SQLite(), "R-Clases/week-2/clase_10/database/bank.database.db")
+
+# Query para seleccionar y transformar datos
+query <- "
+SELECT 
+    age,
+    job,
+    marital,
+    education,
+    has_default = 'yes' AS estado_critico,
+    balance,
+    housing = 'yes' AS housing,
+    loan = 'yes' AS loan,
+    CASE WHEN contact = 'unknown' THEN 'email' ELSE contact END AS contact,
+    duration > 50 AS interes_prestamo,
+    -- campaign,
+    CASE 
+        WHEN pdays = -1 THEN 'nada'
+        WHEN pdays BETWEEN 0 AND 30 THEN 'mucho'
+        WHEN pdays BETWEEN 31 AND 90 THEN 'medio'
+        WHEN pdays BETWEEN 91 AND 180 THEN 'poco'
+        ELSE 'nada' 
+    END AS interes_en_promocion,
+    y AS target
+FROM bank_data;
+"
+
+df <- dbGetQuery(con, query)
+glimpse(df)
+dbDisconnect(con)
+```
+
+
+```{R eda}
+# Generar un reporte rápido del dataset
+skim(df)
+# create_report(df,output_file = "R-Clases/week-2/clase_10/reports/reporte_banco.html")
+
+# Alternativa rápida con gráficas básicas
+df %>%
+  select(age, balance, housing, loan, estado_critico, target) %>%
+  summary()
+
+# Distribución de la variable objetivo
+distribucion_target <- ggplot(df, aes(x = target)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Distribución de clientes según riesgo (target)")
+
+# Distribución de edad vs riesgo
+distribucion_edad_riesgo <- ggplot(df, aes(x = age, fill = target)) +
+  geom_histogram(binwidth = 5, position = "dodge") +
+  labs(title = "Edad de clientes por riesgo")
+
+distribucion_target / distribucion_edad_riesgo
+
+```
+
+
+
+```{R limpieza de los datos}
+library(tidymodels)
+library(dplyr)
+
+# Convertimos booleanos (0/1) en factores
+df <- df %>%
+  mutate(
+    estado_critico = as.factor(estado_critico),
+    housing = as.factor(housing),
+    loan = as.factor(loan),
+    interes_prestamo = as.factor(interes_prestamo),
+    target = as.factor(target)
+  )
+
+# Definir recipe
+bank_recipe <- recipe(target ~ ., data = df) %>%
+  # Convertir variables categóricas a dummies (one-hot encoding)
+  step_dummy(all_nominal_predictors()) %>%
+  # Normalizar variables numéricas
+  step_normalize(all_numeric_predictors())
+
+# Previsualizar el recipe
+summary(bank_recipe)
+
+# Preparar el recipe (entrenamiento)
+bank_prep <- prep(bank_recipe)
+
+# Aplicar transformaciones al dataset
+bank_processed <- bake(bank_prep, new_data = NULL)
+
+# Ver resultado
+glimpse(bank_processed)
+```
+
+
+```{R splitting}
+set.seed(42)
+split <- initial_split(df, prop = 0.8, strata = target)
+train_data <- training(split)
+test_data <- testing(split)
+```
+
+```{R receta-pipe-data}
+
+bank_recipe <- recipe(target ~ ., data = train_data) %>%
+    # Convertir variables booleanas y categóricas a factores
+    step_mutate(
+        estado_critico = as.factor(estado_critico),
+        housing = as.factor(housing),
+        loan = as.factor(loan),
+        target = as.factor(target)
+    ) %>%
+    step_dummy(all_nominal_predictors(), -all_outcomes()) %>% # One-hot encoding
+    step_normalize(all_numeric_predictors()) %>%                 # Normalización
+    step_upsample(target)
+```
+
+
+
+```{R seleccion-de-modelos}
+library(tidymodels)
+
+# Random Forest rápido
+rf_model_fast <- rand_forest(
+  mode = "classification",
+  trees = 50,      # menos árboles
+  min_n = 5        # tamaño mínimo de nodo
+) %>%
+  set_engine("ranger")  # sin importance ni verbose para más rápido
+
+# Logistic Regression 
+log_model_fast <- logistic_reg(mode = "classification") %>%
+  set_engine("glm")
+
+# XGBoost rápido
+xgb_model_fast <- boost_tree(
+  mode = "classification",
+  trees = 50,       # menos árboles
+  learn_rate = 0.3, # más alto para converger rápido
+  tree_depth = 3,   # árboles poco profundos
+  min_n = 5
+) %>%
+  set_engine("xgboost", verbose = 0)  # sin imprimir progreso para más rápido
+
+```
+
+
+```{R workflow}
+
+# Workflows
+wf_rf  <- workflow() %>% add_model(rf_model)  %>% add_recipe(bank_recipe)
+wf_log <- workflow() %>% add_model(log_model) %>% add_recipe(bank_recipe)
+wf_xgb <- workflow() %>% add_model(xgb_model) %>% add_recipe(bank_recipe)
+```
+
+```{R train-log}
+cat("Training Logistic Regression...\n")
+fit_log <- fit(wf_log, train_data)
+cat("Logistic Regression training complete!\n\n")```
+
+```{R training-models}
+cat("Training Random Forest...\n")
+fit_rf <- fit(wf_rf, train_data)
+cat("Random Forest training complete!\n\n")
+```
+
+```{R train-xgboost}
+cat("Training XGBoost...\n")
+fit_xgb <- fit(wf_xgb, train_data)
+cat("XGBoost training complete!\n\n")
+```
+
+```{R metricas-evaluate}
+library(yardstick)
+
+# Función para evaluar métricas
+evaluate_model <- function(fit, test_data){
+  preds <- predict(fit, test_data, type = "prob") %>%
+    bind_cols(test_data %>% select(target)) %>%
+    mutate(pred_class = ifelse(.pred_1 > 0.5, "1", "0"))
+
+  metrics <- metric_set(roc_auc, f_meas, precision, recall)
+  metrics(preds, truth = target, estimate = pred_class, .pred_1)
+}
+
+# Evaluar los 3 modelos
+metrics_rf  <- evaluate_model(fit_rf,  test_data)
+metrics_log <- evaluate_model(fit_log, test_data)
+metrics_xgb <- evaluate_model(fit_xgb, test_data)
+
+```
+
+
+```{R benchmark-metrics}
+library(tidyr)
+
+results <- bind_rows(
+  metrics_rf  %>% mutate(model = "Random Forest"),
+  metrics_log %>% mutate(model = "Logistic Regression"),
+  metrics_xgb %>% mutate(model = "XGBoost")
+) %>%
+  select(model, .metric, .estimate)
+
+results %>% pivot_wider(names_from = .metric, values_from = .estimate)
+
+```
