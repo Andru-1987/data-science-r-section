@@ -1,5 +1,5 @@
 ---
-title: "Random Forest Loan"
+title: "Random Forest Loan Challenge"
 author: "Anderson Ocaña"
 date: "`r Sys.Date()`"
 output: html_document

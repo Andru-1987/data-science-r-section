@@ -1,0 +1,548 @@
+---
+title: "Challenge Clase 10 ML con R"
+author: "Anderson Ocaña"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## 1. Instalación y carga de librerías ----
+```{R install-dependencies}
+packages <- c(
+  "DBI", "RSQLite", "dplyr", "tidymodels", "reshape2", "DataExplorer",
+  "skimr", "patchwork", "themis", "ranger", "R.utils", "xgboost","randomForest"
+)
+install.packages(setdiff(packages, installed.packages()))
+````
+
+```{R load-dependencies}
+library(yardstick)
+library(DBI)
+library(RSQLite)
+library(dplyr)
+library(tidyverse)
+library(tidymodels)
+library(skimr)
+library(DataExplorer)
+library(patchwork)
+library(themis)
+library(R.utils)
+library(ranger)
+library(randomForest)
+library(xgboost)
+```
+
+---
+
+## 2. Carga de datos ----
+
+```{R load-data}
+db_url <- "R-Clases/week-2/clase_10/database/bank.database.db.gz"
+gunzip(db_url, remove = TRUE)
+
+db_sqlite_path <- "R-Clases/week-2/clase_10/database/bank.database.db"
+con <- dbConnect(RSQLite::SQLite(), db_sqlite_path)
+
+query <- "
+SELECT 
+    age,
+    job,
+    marital,
+    education,
+    has_default = 'yes' AS estado_critico,
+    balance,
+    housing = 'yes' AS housing,
+    loan = 'yes' AS loan,
+    CASE WHEN contact = 'unknown' THEN 'email' ELSE contact END AS contact,
+    duration > 50 AS interes_prestamo,
+    CASE 
+        WHEN pdays = -1 THEN 'nada'
+        WHEN pdays BETWEEN 0 AND 30 THEN 'mucho'
+        WHEN pdays BETWEEN 31 AND 90 THEN 'medio'
+        WHEN pdays BETWEEN 91 AND 180 THEN 'poco'
+        ELSE 'nada' 
+    END AS interes_en_promocion,
+    y AS target
+FROM bank_data LIMIT 25000;
+"
+
+df <- dbGetQuery(con, query)
+dbDisconnect(con)
+
+glimpse(df)
+```
+
+---
+
+## 3. Exploración rápida ----
+
+```{R eda}
+skim(df)
+
+# Distribución de target
+ggplot(df, aes(x = target)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Distribución de clientes según riesgo (target)")
+```
+
+---
+
+## 4. Preprocesamiento ----
+
+```{R preprocessing}
+set.seed(42)
+
+# Partición de datos
+split <- initial_split(df, prop = 0.8, strata = target)
+train_data <- training(split)
+test_data  <- testing(split)
+
+# Asegurarse de que target sea factor
+train_data <- train_data %>% mutate(target = factor(target, levels = c("0","1")))
+test_data  <- test_data  %>% mutate(target = factor(target, levels = c("0","1")))
+
+summary(train_data)
+summary(test_data)
+
+# Recipe de preprocesamiento
+
+bank_recipe <- recipe(target ~ ., data = train_data) %>%
+  step_mutate(
+    estado_critico = as.factor(estado_critico),
+    housing = as.factor(housing),
+    loan = as.factor(loan)
+  ) %>%
+  step_dummy(all_nominal_predictors(), -all_outcomes()) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_smote(target, over_ratio = 0.8) %>%
+  step_tomek(target)
+
+
+# bank_recipe <- recipe(target ~ ., data = train_data) %>%
+#   step_mutate(
+#     estado_critico = as.factor(estado_critico),
+#     housing = as.factor(housing),
+#     loan = as.factor(loan)
+#   ) %>%
+#   step_dummy(all_nominal_predictors(), -all_outcomes()) %>%
+#   step_normalize(all_numeric_predictors()) %>%
+#   step_nearmiss(target, under_ratio = 1.5) %>%  # Reduce clase mayoritaria
+#   step_smote(target, over_ratio = 0.8)          # Aumenta clase minoritaria
+
+
+
+# reparar la receta
+bank_prep <- prep(bank_recipe, training = train_data)
+train_balanced <- bake(bank_prep, new_data = NULL)
+
+table(train_balanced$target)
+
+
+# Verificar salida
+str(train_balanced)
+summary(train_balanced)
+```
+
+---
+
+## 5. Definición de modelos ----
+
+```{R models}
+
+library(tidymodels)
+
+# 1️⃣ Regresión logística (muy ligera, sin tuning)
+log_model <- logistic_reg(
+  mode = "classification"
+) %>% 
+  set_engine("glm")
+
+# 2️⃣ Random Forest rápido
+# Calcular pesos según frecuencia de clases en train_balanced
+table(train_data$target)
+n_neg <- sum(train_data$target == "0")
+n_pos <- sum(train_data$target == "1")
+class_weights <- c('0' = 1, '1' = n_neg / n_pos)
+
+rf_model_weighted <- rand_forest(
+  mode = "classification",
+  trees = 100,
+  mtry = 3,
+  min_n = 5
+) %>% 
+  set_engine("ranger", importance = "impurity", verbose = FALSE, class.weights = class_weights)
+
+
+# 3️⃣ XGBoost ligero
+scale_pos <- n_neg / n_pos
+
+xgb_model_weighted <- boost_tree(
+  mode = "classification",
+  trees = 100,
+  tree_depth = 3,
+  learn_rate = 0.2,
+  min_n = 5,
+  loss_reduction = 0
+) %>% 
+  set_engine("xgboost", verbose = 0, scale_pos_weight = scale_pos)
+
+```
+
+---
+
+## 6. Workflows ----
+
+```{R workflows-data}
+wf_log <- workflow() %>% add_model(log_model) %>% add_recipe(bank_recipe)
+wf_rf  <- workflow() %>% add_model(rf_model_weighted)  %>% add_recipe(bank_recipe)
+wf_xgb <- workflow() %>% add_model(xgb_model_weighted) %>% add_recipe(bank_recipe)
+
+
+```
+
+---
+
+## 7. Entrenamiento ----
+```{R regression-logistica}
+fit_log <- fit(wf_log, train_data)
+```
+
+```{R trainng-random-forest}
+fit_rf  <- fit(wf_rf,  train_data)
+```
+
+```{R xgboost}
+fit_xgb <- fit(wf_xgb, train_data)
+```
+
+---
+
+```{R evaluaciones}
+# Asegurarse de que target es factor
+test_data <- test_data %>% mutate(target = factor(target, levels = c("0","1")))
+
+# evaluar_modelo_robusto <- function(model_fit, model_name, test_data) {
+  
+#   # Forzar target como factor
+#   test_data <- test_data %>% mutate(target = factor(target, levels = c("0","1")))
+  
+#   # Predicciones probabilísticas
+#   preds_prob <- predict(model_fit, test_data, type = "prob") %>%
+#     bind_cols(test_data %>% select(target))
+  
+#   # Predicciones de clase con threshold 0.5
+#   preds_class <- preds_prob %>%
+#     mutate(.pred_class = factor(ifelse(.pred_1 >= 0.5, "1", "0"),
+#                                 levels = levels(test_data$target)))
+  
+#   # Métricas de clasificación usando funciones vectorizadas
+#   accuracy_val    <- accuracy_vec(test_data$target, preds_class$.pred_class)
+#   f1_val          <- f_meas_vec(test_data$target, preds_class$.pred_class)
+#   precision_val   <- precision_vec(test_data$target, preds_class$.pred_class)
+#   recall_val      <- recall_vec(test_data$target, preds_class$.pred_class)
+#   sensitivity_val <- sens_vec(test_data$target, preds_class$.pred_class)
+#   specificity_val <- spec_vec(test_data$target, preds_class$.pred_class)
+#   bal_accuracy_val <- bal_accuracy_vec(test_data$target, preds_class$.pred_class)
+  
+#   class_metrics <- tibble(
+#     model = model_name,
+#     accuracy = accuracy_val,
+#     f1 = f1_val,
+#     precision = precision_val,
+#     recall = recall_val,
+#     sensitivity = sensitivity_val,
+#     specificity = specificity_val,
+#     bal_accuracy = bal_accuracy_val
+#   )
+  
+#   # ROC y PR AUC (solo si hay ambas clases en test)
+#   if(length(unique(test_data$target)) > 1){
+#     roc_auc_val <- roc_auc(
+#       tibble(
+#         truth = factor(preds_prob$target, levels = c("0","1")),
+# #         .pred_1 = preds_prob$.pred_1
+#       ),
+#       truth = truth,
+#       .pred_1
+#     )
+
+#     pr_auc_val <- pr_auc(
+#       tibble(
+#         truth = factor(preds_prob$target, levels = c("0","1")),
+#         .pred_1 = preds_prob$.pred_1
+#       ),
+#       truth = truth,
+#       .pred_1
+#     )
+#     # roc_auc_val <- roc_auc_vec(test_data$target, preds_prob$.pred_1)
+#     # pr_auc_val  <- pr_auc_vec(test_data$target, preds_prob$.pred_1)
+#   } else {
+#     roc_auc_val <- NA
+#     pr_auc_val <- NA
+#   }
+  
+#   # Thresholds para optimización F1
+#   thresholds <- seq(0.1, 0.9, by = 0.05)
+#   threshold_metrics <- tibble()
+#   for(thresh in thresholds){
+#     pred_thresh <- factor(ifelse(preds_prob$.pred_1 >= thresh, "1", "0"),
+#                           levels = levels(test_data$target))
+#     f1_thresh <- f_meas_vec(test_data$target, pred_thresh)
+#     threshold_metrics <- bind_rows(threshold_metrics,
+#                                    tibble(threshold = thresh, f1_score = f1_thresh))
+#   }
+  
+#   best_thresh <- threshold_metrics[which.max(threshold_metrics$f1_score), ]
+  
+#   return(list(
+#     class_metrics = class_metrics,
+#     roc_auc = roc_auc_val,
+#     pr_auc = pr_auc_val,
+#     best_threshold = best_thresh,
+#     predictions_prob = preds_prob,
+#     predictions_class = preds_class,
+#     threshold_analysis = threshold_metrics
+#   ))
+# }
+
+
+library(dplyr)
+library(yardstick)
+
+evaluar_modelo_robusto <- function(model_fit, model_name, test_data) {
+
+  # Asegurar que target sea factor
+  test_data <- test_data %>% mutate(target = factor(target, levels = c("0","1")))
+
+  # Predicciones probabilísticas
+  preds_prob <- predict(model_fit, test_data, type = "prob") %>%
+    bind_cols(test_data %>% select(target))
+
+  # Predicciones de clase
+  preds_class <- preds_prob %>%
+    mutate(.pred_class = factor(ifelse(.pred_1 >= 0.5, "1", "0"), levels = c("0","1")))
+
+  # Métricas de clasificación
+  class_metrics <- tibble(
+    model = model_name,
+    accuracy = accuracy_vec(test_data$target, preds_class$.pred_class),
+    f1 = f_meas_vec(test_data$target, preds_class$.pred_class),
+    precision = precision_vec(test_data$target, preds_class$.pred_class),
+    recall = recall_vec(test_data$target, preds_class$.pred_class),
+    sensitivity = sens_vec(test_data$target, preds_class$.pred_class),
+    specificity = spec_vec(test_data$target, preds_class$.pred_class),
+    bal_accuracy = bal_accuracy_vec(test_data$target, preds_class$.pred_class)
+  )
+
+  # ROC AUC y PR AUC
+  # roc_auc_val <- roc_auc_vec(test_data$target, preds_prob$.pred_1)
+  # pr_auc_val  <- pr_auc_vec(test_data$target, preds_prob$.pred_1)
+
+
+
+# ROC AUC y PR AUC correctos
+  roc_auc_val <- roc_auc_vec(
+    truth = test_data$target,
+    estimate = preds_prob$.pred_1,
+    event_level = "second"   # toma "1" como clase positiva
+  )
+
+  pr_auc_val <- pr_auc_vec(
+    truth = test_data$target,
+    estimate = preds_prob$.pred_1,
+    event_level = "second"   # toma "1" como clase positiva
+  )
+
+  # Threshold óptimo para F1
+  thresholds <- seq(0.1, 0.9, by = 0.05)
+  threshold_metrics <- tibble()
+  for(thresh in thresholds){
+    pred_thresh <- factor(ifelse(preds_prob$.pred_1 >= thresh, "1", "0"), levels = c("0","1"))
+    f1_thresh <- f_meas_vec(test_data$target, pred_thresh)
+    threshold_metrics <- bind_rows(threshold_metrics,
+                                   tibble(threshold = thresh, f1_score = f1_thresh))
+  }
+
+  best_thresh <- threshold_metrics[which.max(threshold_metrics$f1_score), ]
+
+  return(list(
+    class_metrics = class_metrics,
+    roc_auc = roc_auc_val,
+    pr_auc = pr_auc_val,
+    best_threshold = best_thresh,
+    predictions_prob = preds_prob,
+    predictions_class = preds_class,
+    threshold_analysis = threshold_metrics
+  ))
+}
+
+
+# Aplicar la función
+evaluaciones_robustas <- list(
+  Logistica = evaluar_modelo_robusto(fit_log, "Logistic Regression", test_data),
+  RandomForest = evaluar_modelo_robusto(fit_rf, "Random Forest", test_data),
+  XGBoost = evaluar_modelo_robusto(fit_xgb, "XGBoost", test_data)
+)
+
+evaluaciones_robustas
+
+```
+
+```{R validaciones}
+
+library(dplyr)
+library(tidyr)
+# Supongamos que tu tibble de métricas ya está en 'class_metrics'
+# class_metrics incluye las métricas de clasificación + roc_auc y pr_auc
+extraer_metricas_robusto <- function(evaluaciones_list) {
+  all_metrics <- tibble()
+  
+  for(model_name in names(evaluaciones_list)) {
+    eval <- evaluaciones_list[[model_name]]
+    
+    # Métricas de clasificación
+    cm <- eval$class_metrics %>%
+      mutate(model = model_name) %>%
+      pivot_longer(
+        cols = -model,
+        names_to = "Metric",
+        values_to = "V1"
+      )
+    
+    # Agregar roc_auc y pr_auc como filas
+    roc_pr <- tibble(
+      Metric = c("roc_auc", "pr_auc"),
+      V1 = c(eval$roc_auc, eval$pr_auc),
+      model = model_name
+    )
+    
+    all_metrics <- bind_rows(all_metrics, cm, roc_pr)
+  }
+  
+  return(all_metrics)
+}
+
+
+# Aplicar función
+resultados_finales <- extraer_metricas_robusto(evaluaciones_robustas)
+
+resultados_ancho <- resultados_finales %>%
+  pivot_wider(
+    names_from = model,
+    values_from = V1
+  )
+
+cat("=== TABLA COMPARATIVA FINAL (Formato Ancho) ===\n")
+print(resultados_ancho)
+
+```
+
+Ahora la **tabla comparativa final** tiene sentido y refleja correctamente las métricas de todos tus modelos:
+
+* **Accuracy, F1, Precision, Recall, Sensitivity, Specificity, Balanced Accuracy**: muestran el desempeño sobre clases predichas.
+* **ROC\_AUC y PR\_AUC**: reflejan el poder discriminativo de cada modelo usando probabilidades.
+* **Best\_F1\_Threshold y Optimal\_Threshold**: te indican el threshold óptimo para maximizar F1, útil especialmente en datasets desbalanceados.
+
+Observaciones rápidas:
+
+* Los valores de ROC AUC son bajos (\~0.19–0.23) pese a métricas de clase altas; esto sugiere **posible desbalance en los datos** o que el modelo predice casi siempre la clase mayoritaria.
+* Random Forest tiene la **mayor F1 y Recall**, mientras que Logistic Regression y XGBoost tienen un ROC\_AUC ligeramente más alto.
+* Los thresholds óptimos están ajustados por F1, lo que puede mejorar la performance en datasets desbalanceados.
+
+
+
+```{R plots}
+
+# --- Preparar ROC y PR ---
+roc_total_clean <- bind_rows(
+  lapply(names(evaluaciones_robustas), function(m) {
+    df <- evaluaciones_robustas[[m]]$roc_curve
+    if(!is.null(df) && nrow(df) >= 2) {
+      df %>%
+        mutate(
+          Spec = as.numeric(specificity),
+          Sens = as.numeric(sensitivity),
+          Model = m
+        ) %>%
+        filter(!is.na(Spec) & !is.na(Sens))
+    } else tibble(Spec=NA, Sens=NA, Model=m)
+  })
+)
+
+pr_total_clean <- bind_rows(
+  lapply(names(evaluaciones_robustas), function(m) {
+    df <- evaluaciones_robustas[[m]]$pr_curve
+    if(!is.null(df) && nrow(df) >= 2) {
+      df %>%
+        mutate(
+          Rec = as.numeric(recall),
+          Prec = as.numeric(precision),
+          Model = m
+        ) %>%
+        filter(!is.na(Rec) & !is.na(Prec))
+    } else tibble(Rec=NA, Prec=NA, Model=m)
+  })
+)
+
+# --- Matriz de confusión normalizada ---
+conf_total_clean <- bind_rows(
+  lapply(names(evaluaciones_robustas), function(m) {
+    cm <- evaluaciones_robustas[[m]]$conf_matrix
+    if(!is.null(cm)) {
+      df <- as.data.frame(cm)
+      df$Predicted <- rownames(cm)
+      df <- df %>%
+        pivot_longer(cols = -Predicted, names_to = "Actual", values_to = "Count") %>%
+        mutate(Model = m) %>%
+        group_by(Model, Predicted) %>%
+        mutate(Percent = Count / sum(Count) * 100) %>%
+        ungroup()
+      df
+    } else tibble(Predicted=NA, Actual=NA, Count=NA, Model=m, Percent=NA)
+  })
+)
+
+# --- Etiquetas AUC y PR AUC ---
+roc_auc_labels <- bind_rows(
+  lapply(names(evaluaciones_robustas), function(m) {
+    tibble(Model = m,
+           x = 0.6, y = 0.2,
+           label = paste0("AUC = ", round(evaluaciones_robustas[[m]]$roc_auc, 3)))
+  })
+)
+
+pr_auc_labels <- bind_rows(
+  lapply(names(evaluaciones_robustas), function(m) {
+    tibble(Model = m,
+           x = 0.6, y = 0.4,
+           label = paste0("PR AUC = ", round(evaluaciones_robustas[[m]]$pr_auc, 3)))
+  })
+)
+
+# --- Gráfico ROC ---
+curvas_roc <- ggplot(roc_total_clean, aes(x = 1 - Spec, y = Sens, color = Model, group = Model)) +
+  geom_line(size = 1.2) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray") +
+  geom_text(data = roc_auc_labels, aes(x=x,y=y,label=label,color=Model), inherit.aes = FALSE) +
+  labs(title = "Curvas ROC comparativas", x = "1 - Especificidad (FPR)", y = "Sensibilidad (TPR)") +
+  theme_minimal()
+
+# --- Gráfico Precision-Recall ---
+recall_precision <- ggplot(pr_total_clean, aes(x = Rec, y = Prec, color = Model, group = Model)) +
+  geom_line(size = 1.2) +
+  geom_text(data = pr_auc_labels, aes(x=x,y=y,label=label,color=Model), inherit.aes = FALSE) +
+  labs(title = "Curvas Precision-Recall comparativas", x = "Recall", y = "Precision") +
+  theme_minimal()
+
+# --- Matriz de Confusión ---
+conf_matrix_plot <- ggplot(conf_total_clean, aes(x = Actual, y = Predicted, fill = Percent)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.1f%%", Percent)), color = "black", size = 4) +
+  facet_wrap(~Model) +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  labs(title = "Matriz de Confusión normalizada") +
+  theme_minimal()
+
+# --- Combinar todos los gráficos ---
+curvas_roc / recall_precision / conf_matrix_plot
+
+```

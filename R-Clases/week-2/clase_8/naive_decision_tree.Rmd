@@ -19,7 +19,7 @@ geometry: margin=1in
 
 ### [Shiny](https://shiny.posit.co/)
 
-```{R training}
+```{R setup ,include=FALSE }
 
 packages <- c("tictoc","naivebayes", "klaR","discrim","vip")
 install.packages(setdiff(packages, rownames(installed.packages())))
@@ -30,6 +30,7 @@ library(tidyverse)
 library(discrim)
 library(tidymodels)
 library(vip)
+library(workflowsets)
 ```
 
 ## 1. ¿Cuál podría ser la variable a predecir?
@@ -102,9 +103,9 @@ analyze_variable_distribution <- function(var_name) {
   # Identificar celdas con 0 (problemas potenciales)
   zero_cells <- which(cross_table == 0, arr.ind = TRUE)
   if(nrow(zero_cells) > 0) {
-    cat("⚠️  CELDAS CON 0 (problemáticas):", nrow(zero_cells), "\n")
+    cat(" CELDAS CON 0 (problemáticas):", nrow(zero_cells), "\n")
   } else {
-    cat("✅ Sin celdas vacías\n")
+    cat(" Sin celdas vacías\n")
   }
   
   return(nrow(zero_cells))
@@ -132,10 +133,10 @@ variable_ranking <- data.frame(
   arrange(Celdas_Vacias) %>%
   mutate(
     Recomendacion = case_when(
-      Celdas_Vacias == 0 ~ "✅ EXCELENTE - Usar siempre",
-      Celdas_Vacias <= 5 ~ "✅ BUENA - Recomendada",
-      Celdas_Vacias <= 10 ~ "⚠️ MODERADA - Usar con cuidado", 
-      TRUE ~ "❌ PROBLEMÁTICA - Evitar"
+      Celdas_Vacias == 0 ~ " EXCELENTE - Usar siempre",
+      Celdas_Vacias <= 5 ~ " BUENA - Recomendada",
+      Celdas_Vacias <= 10 ~ " MODERADA - Usar con cuidado", 
+      TRUE ~ " PROBLEMÁTICA - Evitar"
     )
   )
 
@@ -276,10 +277,9 @@ nb_fit <- fit(nb_wf, data = train_data)
 bayes_fit <- fit(bayes_wf, data = train_data)
 ```
 
-```{R save-model}
-# saveRDS(tree_fit, "./models/decision_tree.rds")
-saveRDS(nb_fit, "R-Clases/week-2/clase_8/models/nb_fit.rds")
-saveRDS(bayes_fit, "R-Clases/week-2/clase_8/models/bayes_fit.rds")
+```{R save-model , include=FALSE}
+# saveRDS(nb_fit, file = file.path(getwd(), "./R-Clases/week-2/clase_8/models/nb_fit.rds"))
+# saveRDS(bayes_fit, file = file.path(getwd(), ./"R-Clases/week-2/clase_8/models/bayes_fit.rds"))
 ```
 
 
@@ -300,7 +300,7 @@ pred_bayes <- predict(bayes_fit, test_data, type = "prob") %>%
 
 
 
-cat("📋 INSPECCIONANDO NOMBRES DE COLUMNAS:\n")
+cat("INSPECCIONANDO NOMBRES DE COLUMNAS:\n")
 cat("Nombres en pred_nb:\n")
 print(names(pred_nb))
 
@@ -385,11 +385,11 @@ autoplot(conf_mat_bayes, type = "heatmap") + ggtitle("Matriz de Confusión - Bay
 ```{R curva-roc}
 library(patchwork)
 
-p_nb <- autoplot(roc_nb_curves) + ggtitle("Curvas ROC - Naive Bayes")
-p_bayes <- autoplot(roc_bayes_curves) + ggtitle("Curvas ROC - Bayes Logístico")
+# p_nb <- autoplot(roc_nb_curves) + ggtitle("Curvas ROC - Naive Bayes")
+# p_bayes <- autoplot(roc_bayes_curves) + ggtitle("Curvas ROC - Bayes Logístico")
 
-# Juntarlos lado a lado
-p_nb + p_bayes + plot_layout(ncol = 2)
+# # Juntarlos lado a lado
+# p_nb + p_bayes + plot_layout(ncol = 2)
 
 ```
 
