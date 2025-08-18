@@ -4,6 +4,10 @@ services:
     build:
       context: .
       dockerfile: .devcontainer/Dockerfile
+      args:
+        USER_UID: ${UID:-1000}   # si UID no está definido, usa 1000
+        USER_GID: ${GID:-1000}   # si GID no está definido, usa 1000
+
     command: tail -f /dev/null
     volumes:
       # Monta la carpeta raíz del workspace, no una subcarpeta

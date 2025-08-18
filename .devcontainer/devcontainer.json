@@ -10,7 +10,7 @@
         "RDebugger.r-debugger"
       ],
       "settings": {
-        "r.rterm.linux": "/usr/local/bin/radian",
+        "r.rterm.linux": "/home/devuser/.local/bin/radian"
         "r.bracketedPaste": true,
         "terminal.integrated.defaultProfile.linux": "bash"
       }
@@ -18,18 +18,12 @@
   },
   "forwardPorts": [
     8000
-    ,
-    3306
   ],
   "portsAttributes": {
     "8000": {
       "label": "R Plumber API"
     }
-    ,
-    "3306": {
-      "label": "MySQL"
-    }
   },
   "postCreateCommand": "bash /workspaces/post-create.sh",
-  "remoteUser": "root"
+  "remoteUser": "devuser"
 }

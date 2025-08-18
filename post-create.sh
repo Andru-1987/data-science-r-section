@@ -1,35 +1,30 @@
 #!/bin/bash
 
-# Post-creation script for R dev container
+# Post-creation script for R dev container (non-root user)
 set -e
+
 echo "*****************************************************************************"
 echo "Setting up R development environment..."
 
-# Create symlink so VS Code can find radian where it expects
-mkdir -p /usr/local/bin
-ln -sf /root/.local/bin/radian /usr/local/bin/radian
+# --- Crear carpeta de librería de usuario ---
+USER_R_LIB="$HOME/R/library"
+mkdir -p "$USER_R_LIB"
 
-# Install R packages
-Rscript -e "
-install.packages(c(
-  'readr', 
-  'dplyr', 
-  'DBI', 
-  'RMySQL', 
-  'RSQLite', 
-  'plumber', 
-  'languageserver', 
-  'rmarkdown', 
-  'knitr', 
-  'here', 
-  'tidyverse',
-  'tidymodels'
-), repos='https://cloud.r-project.org')
-"
+# --- Asegurarse de que ~/.local/bin esté en PATH ---
+export PATH="$HOME/.local/bin:$PATH"
 
+# --- Instalar paquete individual ---
+Rscript -e "install.packages('languageserver', repos='https://cloud.r-project.org', lib='$USER_R_LIB')"
 
-# Set up .Rprofile for project
-cat > .Rprofile << 'EOF'
+# --- Instalar paquetes R principales ---
+Rscript -e "install.packages(
+  c('readr','dplyr','DBI','RMySQL','RSQLite','plumber','rmarkdown','knitr','here','tidyverse','tidymodels'),
+  repos='https://cloud.r-project.org',
+  lib='$USER_R_LIB'
+)"
+
+# --- Crear .Rprofile en home del usuario ---
+cat > "$HOME/.Rprofile" << 'EOF'
 # Project .Rprofile
 options(
   repos = c(CRAN = "https://cloud.r-project.org"),
@@ -39,7 +34,7 @@ options(
   digits = 4
 )
 
-# Load commonly used packages
+# Cargar paquetes comúnmente usados
 if (interactive()) {
   suppressMessages({
     if(requireNamespace("here", quietly = TRUE)) require(here)
@@ -52,6 +47,7 @@ if (interactive()) {
 }
 EOF
 
+echo "*****************************************************************************"
 echo "Setup complete. Your R development environment is ready."
-echo "You can run 'radian' for an enhanced R console."
+echo "You can run 'radian' for an enhanced R console (already in your PATH)."
 echo "Your R files should go inside the R-Clases/ folder."
