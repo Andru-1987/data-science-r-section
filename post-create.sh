@@ -1,31 +1,25 @@
 #!/bin/bash
-
-# Post-creation script for R dev container (non-root user)
 set -e
 
 echo "*****************************************************************************"
 echo "Setting up R development environment..."
 
-# --- Crear carpeta de librería de usuario ---
+# --- Librería de usuario ---
 USER_R_LIB="$HOME/R/library"
 mkdir -p "$USER_R_LIB"
 
-# --- Asegurarse de que ~/.local/bin esté en PATH ---
+# --- PATH para radian ---
 export PATH="$HOME/.local/bin:$PATH"
 
-# --- Instalar paquete individual ---
-Rscript -e "install.packages('languageserver', repos='https://cloud.r-project.org', lib='$USER_R_LIB')"
-
-# --- Instalar paquetes R principales ---
+# --- Instalar paquetes R ---
 Rscript -e "install.packages(
-  c('readr','dplyr','DBI','RMySQL','RSQLite','plumber','rmarkdown','knitr','here','tidyverse','tidymodels'),
+  c('languageserver','readr','dplyr','DBI','RMySQL','RSQLite','plumber','rmarkdown','knitr','here','tidyverse','tidymodels'),
   repos='https://cloud.r-project.org',
   lib='$USER_R_LIB'
 )"
 
-# --- Crear .Rprofile en home del usuario ---
+# --- Crear .Rprofile ---
 cat > "$HOME/.Rprofile" << 'EOF'
-# Project .Rprofile
 options(
   repos = c(CRAN = "https://cloud.r-project.org"),
   browser = "false",
@@ -34,7 +28,6 @@ options(
   digits = 4
 )
 
-# Cargar paquetes comúnmente usados
 if (interactive()) {
   suppressMessages({
     if(requireNamespace("here", quietly = TRUE)) require(here)
@@ -49,5 +42,5 @@ EOF
 
 echo "*****************************************************************************"
 echo "Setup complete. Your R development environment is ready."
-echo "You can run 'radian' for an enhanced R console (already in your PATH)."
-echo "Your R files should go inside the R-Clases/ folder."
+echo "Run 'radian' for an enhanced R console (already in PATH)."
+echo "Your R files go inside the R-Clases/ folder."

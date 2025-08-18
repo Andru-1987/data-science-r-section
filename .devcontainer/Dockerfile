@@ -16,20 +16,10 @@ RUN apt-get update && apt-get install -y \
     mariadb-client fonts-dejavu \
     && rm -rf /var/lib/apt/lists/*
 
-# --- PATH para pipx ---
-ENV PATH="/root/.local/bin:$PATH"
-
-# --- Instalar radian ---
-RUN pipx install radian && pipx ensurepath
-
-# --- Instalar Pandoc ---
+# --- Instalar Pandoc globalmente ---
 RUN wget https://github.com/jgm/pandoc/releases/download/3.1.11.1/pandoc-3.1.11.1-1-amd64.deb \
     && dpkg -i pandoc-3.1.11.1-1-amd64.deb \
     && rm pandoc-3.1.11.1-1-amd64.deb
-
-# --- Instalar TinyTeX ---
-RUN Rscript -e "install.packages('tinytex', repos='https://cloud.r-project.org')" \
-    && Rscript -e "tinytex::install_tinytex()"
 
 # --- Copiar script post-create ---
 COPY post-create.sh /workspaces/post-create.sh
@@ -44,6 +34,10 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
     && chown -R $USERNAME:$USERNAME /workspaces
 
-# --- Usar el usuario no root ---
+# --- Cambiar a usuario no root ---
 USER $USERNAME
 WORKDIR /workspaces/R-Clases
+
+# --- Instalar radian como devuser ---
+RUN pipx install radian
+ENV PATH="$HOME/.local/bin:$PATH"
