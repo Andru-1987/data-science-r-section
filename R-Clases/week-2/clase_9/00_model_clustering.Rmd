@@ -6,12 +6,11 @@ output: html_document
 ---
 
 
+### Instalacion de dependencias
 ```{R setup, message=FALSE, warning=FALSE}
-# Función para instalar y cargar paquetes
-
 load_packages <- c("tidyverse", "tidymodels", "cluster", "factoextra", "mclust", "plotly", "broom", "recipes", "flexclust","factoextra","fossil","vip","themis")
 install.packages(setdiff(load_packages,installed.packages()))
-````
+```
 
 ## 1. Carga de datos
 ```{R import-dependencies}
@@ -42,7 +41,6 @@ wine <- read.table(wine_url, header = FALSE, sep = ",", stringsAsFactors = FALSE
 
 glimpse(wine)
 ```
-
 ## 2. Preprocesamiento con recipes
 
 ```{R}
@@ -59,6 +57,7 @@ wine_recipe <- recipe(~ ., data = wine %>%
 ## 3. Selección del número óptimo de clusters
 
 ```{R}
+
 elbow <- fviz_nbclust(pca_data, kmeans, method = "wss") + 
   labs(title = "Método del Codo (WSS)")
 
@@ -135,8 +134,8 @@ plot_gmm <- ggplot(pca_data, aes(x = PC1, y = PC2, color = cluster_gmm)) +
 plot_kmeans / plot_gmm 
 ```
 
-
-```{R subplot-3d}
+## Generacion de grafico en 3D usando plotly
+```{R subplot-3d, eval=FALSE}
 library(plotly)
 library(viridis)
 
@@ -192,7 +191,6 @@ fig <- plot_ly(type = "scatter3d", mode = "markers") %>%
   )
 
 fig
-
 
 ```
 ## 8. Guardado de modelos y preprocesamiento

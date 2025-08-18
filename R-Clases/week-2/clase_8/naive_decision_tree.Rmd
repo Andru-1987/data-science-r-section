@@ -346,7 +346,7 @@ roc_bayes <- suppressWarnings(
   roc_auc(pred_bayes, truth = Cat_HPV, !!!syms(prob_cols_bayes), estimator = "hand_till")
 )
 
-# ✅ AGREGAR ROC-AUC AL FINAL DE CADA TIBBLE
+# AGREGAR ROC-AUC AL FINAL DE CADA TIBBLE
 nb_metrics_complete <- bind_rows(nb_metrics_macro, roc_nb)
 bayes_metrics_complete <- bind_rows(bayes_metrics_macro, roc_bayes)
 

@@ -1,0 +1,689 @@
+---
+title: "Challenge Clase 10 ML con R"
+author: "Anderson Ocaña"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+### 1. Abstract
+
+### 📂 Dataset: Bank Marketing (100.000 registros)
+- `Variables`: age, job, marital, education, balance, contact, housing, loan, target, entre otras.
+- 🎯 Objetivo: Explorar factores que influyen en la respuesta del cliente a campañas de marketing (target).
+- 🔍 Interacciones potenciales: balance, duración del contacto, tipo de contacto, préstamos activos.
+- 🤖 Posible ML: Clasificación binaria para predecir respuesta (target) | propension a la darse de a la propuesta.
+
+
+### 2. Preguntas e Hipótesis
+
+| Pregunta                                                                        | Hipótesis                                                                      |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ¿Clientes con mayor balance tienen más probabilidad de responder positivamente? | Clientes con balance más alto responderán más (target = 1).                    |
+| ¿El tipo de contacto influye en la aceptación de la oferta?                     | Contactos directos (teléfono) generan más conversiones que desconocidos/email. |
+| ¿Préstamos activos o vivienda propia afectan la decisión?                       | Clientes con préstamos o hipotecas están menos propensos a responder.          |
+
+---
+
+### 3. Instalación y carga de librerías
+
+```{R install-load-packages, warning=FALSE, message=FALSE}
+packages <- c(
+  "DBI", "RSQLite", "dplyr", "tidymodels", "reshape2", "DataExplorer",
+  "skimr", "patchwork", "themis", "ranger", "R.utils", "xgboost","randomForest",
+  "ggplot2", "plotly", "corrplot"
+)
+
+install.packages(setdiff(packages, installed.packages()))
+
+library(DBI)
+library(RSQLite)
+library(dplyr)
+library(tidymodels)
+library(skimr)
+library(DataExplorer)
+library(patchwork)
+library(themis)
+library(R.utils)
+library(ranger)
+library(randomForest)
+library(xgboost)
+library(ggplot2)
+library(plotly)
+library(corrplot)
+```
+
+---
+
+### 4. Carga de datos
+
+```{R loading-function}
+
+load_by_query <- function(query, database="R-Clases/week-3/00_ProyectoR/database/bank.database.db"){
+  if (!file.exists(database)){
+    db_url <- paste0("R-Clases/week-3/00_ProyectoR/database/bank.database.db",".gz")
+    gunzip(db_url, remove = FALSE)    
+  }
+  con <- dbConnect(RSQLite::SQLite(), database)
+
+  df <- dbGetQuery(con, query)
+  dbDisconnect(con)
+  
+  if(file.exists(database)){
+    file.remove(database)
+  }
+  return(df)
+}
+
+```
+
+```{R load-data}
+
+query <- "
+SELECT 
+    age,
+    job,
+    marital,
+    education,
+    has_default = 'yes' AS estado_critico,
+    balance,
+    housing = 'yes' AS housing,
+    loan = 'yes' AS loan,
+    CASE WHEN contact = 'unknown' THEN 'email' ELSE contact END AS contact,
+    duration > 50 AS interes_prestamo,
+    CASE 
+        WHEN pdays = -1 THEN 'nada'
+        WHEN pdays BETWEEN 0 AND 30 THEN 'mucho'
+        WHEN pdays BETWEEN 31 AND 90 THEN 'medio'
+        WHEN pdays BETWEEN 91 AND 180 THEN 'poco'
+        ELSE 'nada' 
+    END AS interes_en_promocion,
+    y AS target
+FROM bank_data LIMIT 100000;
+"
+
+df <- load_by_query(query)
+glimpse(df)
+
+```
+
+---
+
+### 5. Exploración rápida (EDA)
+
+#### Verificación de nulos
+
+```{R missing-values}
+print("Validacion si tenemos datos nulos")
+plot_missing(df)
+```
+
+####  Categorizacion de data qualitativa
+```{R labeling}
+
+columns_cuantitativas <- c("balance","age")
+columns_cualitativas <- setdiff(names(df), columns_cuantitativas)
+
+cat("\nCuantitativas:\t", columns_cuantitativas)
+cat("\nCualitativas:\t", columns_cualitativas)
+
+df <- df %>% 
+  mutate(across(all_of(columns_cualitativas), as.factor))  
+glimpse(df)
+```
+
+#### Estadísticas numéricas
+
+```{R eda-cualitativa-cuantitativa}
+skim(df)
+```
+
+#### Distribución de target
+```{R plot-target}
+p1 <- ggplot(df, aes(x = target)) +
+  geom_bar(fill = "steelblue") +
+  labs(x="Acepta Prestamo",y="Q clientes",title = "Distribución de clientes")
+p1
+```
+
+#### Balance vs Target
+
+```{R plot-balance-target}
+p2 <- ggplot(df, aes(x = balance, y = as.numeric(target)-1)) +
+  geom_jitter(alpha = 0.3) +
+  labs(title = "Balance vs Probabilidad de respuesta", x="Balance", y="Acepta Prestamo")
+
+p2
+```
+
+#### Tipo de contacto vs Target
+
+```{r plot-contact-target}
+p3 <- ggplot(df, aes(x = contact, fill = target)) +
+  geom_bar(position = "fill") +
+  labs(title = "Proporción de respuesta por tipo de contacto", y="Proporción")
+
+p3
+```
+
+#### Housing y Loan vs Target
+
+```{r plot-housing-loan}
+p4 <- ggplot(df, aes(x = housing, fill = target)) +
+  geom_bar(position = "fill") +
+  facet_wrap(~loan) +
+  labs(title = "Impacto de préstamos y vivienda en respuesta", y="Proporción")
+p4
+```
+
+```{R mix-plots}
+(p1 + p2) / (p3 + p4) +
+  plot_annotation(
+    title = "Plot Quick Data",
+    theme = theme(plot.title = element_text(size = 18, face = "bold", color = "darkblue"))
+  )
+```
+
+
+## 6. Preprocesamiento de datos
+
+```{R winsorize-function, echo=FALSE}
+  winsorize <- function(x, min_pct = 0.01, max_pct = 0.99){
+    qnts <- quantile(x, probs = c(min_pct, max_pct), na.rm = TRUE)
+    pmax(pmin(x, qnts[2]), qnts[1])
+  }
+```
+
+```{R preprocessing}
+set.seed(42)
+
+# Partición de datos
+split <- initial_split(df, prop = 0.8, strata = target)
+
+train_data <- training(split)
+test_data  <- testing(split)
+
+# # Asegurarse de que target sea factor
+train_data <- train_data %>% mutate(target = factor(target, levels = c("0","1")))
+test_data  <- test_data  %>% mutate(target = factor(target, levels = c("0","1")))
+
+dim(train_data)
+dim(test_data)
+
+# Recipe de preprocesamiento
+
+bank_recipe <- recipe(target ~ ., data = train_data) %>%
+  # Convertir ciertas variables a factor
+  step_mutate(
+    estado_critico = as.factor(estado_critico),
+    housing = as.factor(housing),
+    loan = as.factor(loan)
+  ) %>%
+
+  # Limpiar outliers en variables numéricas
+  step_mutate(across(all_numeric_predictors(), ~ winsorize(., 0.01, 0.99))) %>%  
+  
+  step_dummy(all_nominal_predictors(), -all_outcomes()) %>%
+  # Normalizar variables numéricas
+  step_normalize(all_numeric_predictors()) %>%
+
+  # Balancear clases
+  step_smote(target, over_ratio = 0.8) %>%
+  step_tomek(target)
+
+# Preparar y hornear
+bank_prep <- prep(bank_recipe, training = train_data)
+train_balanced <- bake(bank_prep, new_data = NULL)
+
+# Revisar
+table(train_balanced$target)
+glimpse(train_balanced)
+```
+
+```{R post-tomek-smote}
+
+p1 <- ggplot(train_balanced, aes(x = target)) +
+  geom_bar(fill = "steelblue") +
+  labs(x="Acepta Prestamo",y="Q clientes",title = "Distribución de clientes")
+p1
+```
+
+---
+
+## 7. Definición de modelos de clasificacion
+
+```{R models}
+
+# Regresión logística
+log_model <- logistic_reg(
+  mode = "classification",
+  penalty = 0.01,  # valor fijo
+  mixture = 0.5   # ridge/lasso mix
+) %>%
+  set_engine("glmnet")
+
+
+
+# Random Forest
+# Calcular pesos según frecuencia de clases en train_balanced
+table(train_data$target)
+n_neg <- sum(train_data$target == "0")
+n_pos <- sum(train_data$target == "1")
+class_weights <- c('0' = 1, '1' = n_neg / n_pos)
+
+rf_model_weighted <- rand_forest(
+  mode = "classification",
+  trees = 100,
+  mtry = 3,
+  min_n = 5
+) %>% 
+  set_engine("ranger", importance = "impurity", verbose = FALSE, class.weights = class_weights)
+
+
+# XGBoost ligero
+scale_pos <- n_neg / n_pos
+
+xgb_model_weighted <- boost_tree(
+  mode = "classification",
+  trees = 100,
+  tree_depth = 3,
+  learn_rate = 0.2,
+  min_n = 5,
+  loss_reduction = 0
+) %>% 
+  set_engine("xgboost", verbose = 1, scale_pos_weight = scale_pos)
+
+```
+
+---
+
+## 8. Workflows
+
+```{R workflows-data}
+wf_log <- workflow() %>% add_model(log_model) %>% add_recipe(bank_recipe)
+wf_rf  <- workflow() %>% add_model(rf_model_weighted)  %>% add_recipe(bank_recipe)
+wf_xgb <- workflow() %>% add_model(xgb_model_weighted) %>% add_recipe(bank_recipe)
+```
+
+---
+
+## 9. Entrenamiento
+```{R regression-logistica}
+fit_log <- fit(wf_log, train_data)
+```
+
+```{R trainng-random-forest}
+fit_rf  <- fit(wf_rf,  train_data)
+```
+
+```{R xgboost}
+fit_xgb <- fit(wf_xgb, train_data)
+```
+
+---
+
+```{R evaluaciones}
+# Asegurarse de que target es factor
+test_data <- test_data %>% mutate(target = factor(target, levels = c("0","1")))
+
+evaluar_modelo_robusto <- function(model_fit, model_name, test_data) {
+
+  # Asegurar que target sea factor
+  test_data <- test_data %>% mutate(target = factor(target, levels = c("0","1")))
+
+  # Predicciones probabilísticas
+  preds_prob <- predict(model_fit, test_data, type = "prob") %>%
+    bind_cols(test_data %>% select(target))
+
+  # Predicciones de clase
+  preds_class <- preds_prob %>%
+    mutate(.pred_class = factor(ifelse(.pred_1 >= 0.5, "1", "0"), levels = c("0","1")))
+
+  # Métricas de clasificación
+  class_metrics <- tibble(
+    model = model_name,
+    accuracy = accuracy_vec(test_data$target, preds_class$.pred_class),
+    f1 = f_meas_vec(test_data$target, preds_class$.pred_class),
+    precision = precision_vec(test_data$target, preds_class$.pred_class),
+    recall = recall_vec(test_data$target, preds_class$.pred_class),
+    sensitivity = sens_vec(test_data$target, preds_class$.pred_class),
+    specificity = spec_vec(test_data$target, preds_class$.pred_class),
+    bal_accuracy = bal_accuracy_vec(test_data$target, preds_class$.pred_class)
+  )
+
+
+# ROC AUC y PR AUC correctos
+  roc_auc_val <- roc_auc_vec(
+    truth = test_data$target,
+    estimate = preds_prob$.pred_1,
+    event_level = "second"   # toma "1" como clase positiva
+  )
+
+  pr_auc_val <- pr_auc_vec(
+    truth = test_data$target,
+    estimate = preds_prob$.pred_1,
+    event_level = "second"   # toma "1" como clase positiva
+  )
+
+  # Threshold óptimo para F1
+  thresholds <- seq(0.1, 0.9, by = 0.05)
+  threshold_metrics <- tibble()
+  for(thresh in thresholds){
+    pred_thresh <- factor(ifelse(preds_prob$.pred_1 >= thresh, "1", "0"), levels = c("0","1"))
+    f1_thresh <- f_meas_vec(test_data$target, pred_thresh)
+    threshold_metrics <- bind_rows(threshold_metrics,
+                                   tibble(threshold = thresh, f1_score = f1_thresh))
+  }
+
+  best_thresh <- threshold_metrics[which.max(threshold_metrics$f1_score), ]
+
+  return(list(
+    class_metrics = class_metrics,
+    roc_auc = roc_auc_val,
+    pr_auc = pr_auc_val,
+    best_threshold = best_thresh,
+    predictions_prob = preds_prob,
+    predictions_class = preds_class,
+    threshold_analysis = threshold_metrics
+  ))
+}
+
+
+# Aplicar la función
+evaluaciones_robustas <- list(
+  Logistica = evaluar_modelo_robusto(fit_log, "Logistic Regression", test_data),
+  RandomForest = evaluar_modelo_robusto(fit_rf, "Random Forest", test_data),
+  XGBoost = evaluar_modelo_robusto(fit_xgb, "XGBoost", test_data)
+)
+
+evaluaciones_robustas
+
+```
+
+```{R validaciones}
+
+extraer_metricas_robusto <- function(evaluaciones_list) {
+  all_metrics <- tibble()
+  
+  for(model_name in names(evaluaciones_list)) {
+    eval <- evaluaciones_list[[model_name]]
+    
+    # Métricas de clasificación
+    cm <- eval$class_metrics %>%
+      mutate(model = model_name) %>%
+      pivot_longer(
+        cols = -model,
+        names_to = "Metric",
+        values_to = "V1"
+      )
+    
+    # Agregar roc_auc y pr_auc como filas
+    roc_pr <- tibble(
+      Metric = c("roc_auc", "pr_auc"),
+      V1 = c(eval$roc_auc, eval$pr_auc),
+      model = model_name
+    )
+    
+    all_metrics <- bind_rows(all_metrics, cm, roc_pr)
+  }
+  
+  return(all_metrics)
+}
+
+
+# Aplicar función
+resultados_finales <- extraer_metricas_robusto(evaluaciones_robustas)
+
+resultados_ancho <- resultados_finales %>%
+  pivot_wider(
+    names_from = model,
+    values_from = V1
+  )
+
+cat("TABLA COMPARATIVA FINAL (Formato Ancho)\n")
+resultados_ancho
+
+```
+
+```{R matrices-confusion}
+library(yardstick)
+library(dplyr)
+
+obtener_conf_matrix <- function(model_fit, test_data, model_name) {
+  # Predicciones de clase
+  preds <- predict(model_fit, test_data, type = "class") %>%
+    bind_cols(test_data %>% select(target))
+  
+  # Matriz de confusión
+  cm <- conf_mat(preds, truth = target, estimate = .pred_class)
+  
+  # Opcional: convertir a tibble para mostrar
+  cm_tidy <- tidy(cm) %>%
+    mutate(Model = model_name)
+  
+  return(list(cm = cm, cm_tidy = cm_tidy))
+}
+```
+
+```{R tablas-confusion }
+cm_log <- obtener_conf_matrix(fit_log, test_data, "Logistica")
+cm_rf  <- obtener_conf_matrix(fit_rf, test_data, "RandomForest")
+cm_xgb <- obtener_conf_matrix(fit_xgb, test_data, "XGBoost")
+```
+
+```{R}
+print("Regresion Logistica")
+cm_log$cm
+print("Random Forest")
+cm_rf$cm
+print("XGBoost")
+cm_xgb$cm
+```
+
+
+```{R plots-roc}
+
+plot_roc_model <- function(model_fit, test_data, model_name){
+  preds <- predict(model_fit, test_data, type="prob") %>%
+    bind_cols(test_data %>% select(target))
+  
+  roc_data <- roc_curve(preds, truth = target, .pred_1, event_level = "second")
+  
+  ggplot(roc_data, aes(x = 1 - specificity, y = sensitivity)) +
+    geom_line(color = "blue", size=1) +
+    geom_abline(lty = 2, color = "gray") +
+    labs(title = paste("ROC Curve -", model_name),
+         x = "1 - Specificity",
+         y = "Sensitivity") +
+    theme_minimal()
+}
+
+logistica <- plot_roc_model(fit_log, test_data, "Logistica")
+random_forest <- plot_roc_model(fit_rf, test_data, "Random Forest")
+xgboost <- plot_roc_model(fit_xgb, test_data, "XGBoost")
+
+xgboost / (random_forest + logistica) +
+plot_annotation(
+    title = "Curvas ROC_AUC",
+    theme = theme(plot.title = element_text(size = 18, face = "bold", color = "darkblue"))
+  )
+```
+
+```{R plot-matrix-conf}
+
+plot_conf_matrix <- function(model_fit, test_data, model_name){
+  preds <- predict(model_fit, test_data, type="class") %>%
+    bind_cols(test_data %>% select(target))
+  
+  cm <- conf_mat(preds, truth = target, estimate = .pred_class)
+  
+  autoplot(cm, type = "heatmap") +
+    labs(title = paste("Confusion Matrix -", model_name))
+}
+
+logistica <- plot_conf_matrix(fit_log, test_data, "Logistica")
+random_forest <- plot_conf_matrix(fit_rf, test_data, "Random Forest")
+xgboost <- plot_conf_matrix(fit_xgb, test_data, "XGBoost")
+
+(xgboost + random_forest ) / logistica +
+plot_annotation(
+    title = "Matrix de confusion",
+    theme = theme(plot.title = element_text(size = 18, face = "bold", color = "darkblue"))
+  )
+
+```
+
+
+```{R plot-precision-recall}
+plot_pr_curve <- function(model_fit, test_data, model_name){
+  preds <- predict(model_fit, test_data, type = "prob") %>%
+    bind_cols(test_data %>% select(target))
+  
+  pr_data <- pr_curve(preds, truth = target, .pred_1)
+  
+  ggplot(pr_data, aes(x = recall, y = precision)) +
+    geom_line(color = "darkgreen", size = 1) +
+    labs(title = paste("Precision-Recall Curve -", model_name),
+         x = "Recall",
+         y = "Precision")
+}
+
+logistica <- plot_pr_curve(fit_log, test_data, "Logistica")
+random_forest <- plot_pr_curve(fit_rf, test_data, "Random Forest")
+xgboost <- plot_pr_curve(fit_xgb, test_data, "XGBoost")
+
+(xgboost + random_forest ) / logistica +
+plot_annotation(
+    title = "Matrix de confusion",
+    theme = theme(plot.title = element_text(size = 18, face = "bold", color = "darkblue"))
+  )
+
+```
+
+
+
+```{R plot-general-lift-gain}
+
+plot_model_performance <- function(model_fit, test_data, model_name){
+
+  # ROC Curve
+  preds <- predict(model_fit, test_data, type = "prob") %>%
+    bind_cols(test_data %>% select(target))
+
+  roc_data <- roc_curve(preds, truth = target, .pred_1, event_level = "second")
+  p_roc <- ggplot(roc_data, aes(x = 1 - specificity, y = sensitivity)) +
+    geom_line(color = "blue", linewidth = 1) +
+    geom_abline(linetype = "dashed") +
+    labs(title = paste("ROC -", model_name), x = "FPR", y = "TPR") +
+    theme_minimal()
+
+  # Precision-Recall
+  pr_data <- pr_curve(preds, truth = target, .pred_1)
+  p_pr <- ggplot(pr_data, aes(x = recall, y = precision)) +
+    geom_line(color = "darkgreen", linewidth = 1) +
+    labs(title = paste("PR -", model_name), x = "Recall", y = "Precision") +
+    theme_minimal()
+
+  # Lift / Gains
+  preds_lift <- preds %>%
+    mutate(rank = ntile(.pred_1, 10)) %>%
+    group_by(rank) %>%
+    summarise(actual_positives = sum(as.numeric(target) - 1),
+              total = n()) %>%
+    mutate(cumulative_positives = cumsum(actual_positives),
+           cumulative_pct = cumulative_positives / sum(actual_positives),
+           percentile = rank * 10)
+
+  p_lift <- ggplot(preds_lift, aes(x = percentile, y = cumulative_pct)) +
+    geom_line(color = "purple", linewidth = 1) +
+    geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+    labs(title = paste("Lift -", model_name),
+         x = "Percentile", y = "Cumulative % Positives") +
+    theme_minimal()
+
+  # Devolver lista de plots sin combinarlos
+  list(p_roc = p_roc, p_pr = p_pr, p_lift = p_lift)
+}
+
+# Obtener listas de plots
+plots_log <- plot_model_performance(fit_log, test_data, "Logistica")
+plots_rf  <- plot_model_performance(fit_rf, test_data, "RandomForest")
+plots_xgb <- plot_model_performance(fit_xgb, test_data, "XGBoost")
+
+# Combinar con patchwork
+combined_all <- (plots_log$p_roc | plots_log$p_pr | plots_log$p_lift) /
+                (plots_rf$p_roc  | plots_rf$p_pr  | plots_rf$p_lift) /
+                (plots_xgb$p_roc | plots_xgb$p_pr | plots_xgb$p_lift) +
+  plot_layout(heights = rep(1, 3)) +  # filas iguales
+  plot_annotation(title = "Comparativa de Modelos - Logistica | RandomForest | XGBoost",
+                  theme = theme(plot.title = element_text(size = 18, face = "bold", color = "darkblue")))
+
+combined_all
+
+```
+
+## Analisis sobre la curva de lift
+
+###  **Logística**
+
+* La curva de Lift empieza baja y se eleva lentamente hasta el percentil 75–80%, donde aumenta más rápido.
+* **Interpretación:**
+
+  * El modelo logra identificar positivos, pero **no concentra tan eficientemente** los clientes que aceptan en los percentiles más altos.
+  * Para campañas de marketing, necesitarías revisar más percentiles antes de encontrar la mayoría de positivos.
+* **Resumen práctico:** útil, pero menos potente para priorización que los otros modelos.
+
+---
+
+###  **Random Forest**
+
+* La curva sube más rápido que Logística, especialmente después del percentil 50.
+* **Interpretación:**
+
+  * Random Forest concentra **más positivos reales en los percentiles altos**, por lo que identifica mejor a los clientes top.
+  * Es más eficiente que Logística si tu objetivo es **enfocarte en los clientes con mayor probabilidad de aceptar**.
+* **Resumen práctico:** buen desempeño, más adecuado para campañas de focalización.
+
+---
+
+###  **XGBoost**
+
+* La curva sube rápidamente y casi alcanza el 100% de positivos antes del percentil 90.
+* **Interpretación:**
+
+  * XGBoost **concentra la mayoría de los clientes que aceptan en los percentiles más altos**, muy eficiente.
+  * Si solo apuntas al **top 20–30% de clientes según el modelo**, probablemente captures la mayor parte de positivos.
+* **Resumen práctico:** el modelo más eficiente para priorización; alto Lift significa máximo retorno de esfuerzo.
+
+---
+
+### ** Conclusión comparativa**
+
+| Modelo        | Lift general | Interpretación                                                                  |
+| ------------- | ------------ | ------------------------------------------------------------------------------- |
+| Logística     | Bajo–medio   | Identifica positivos pero menos concentrados; campañas menos focalizadas.       |
+| Random Forest | Medio–alto   | Mejor concentración en percentiles altos; buena para focalizar recursos.        |
+| XGBoost       | Alto         | Excelente concentración; permite apuntar a top clientes con mínimo desperdicio. |
+
+---
+
+
+```{R storage-models}
+# Crear carpeta si no existe
+
+model_path <- "R-Clases/week-3/00_ProyectoR/models/"
+
+
+if(!dir.exists(model_path)){
+  dir.create(model_path)
+}
+
+# Guardar modelos
+saveRDS(fit_log,  file = paste0(model_path,"fit_log.rds"))
+saveRDS(fit_rf,   file = paste0(model_path,"fit_rf.rds"))
+saveRDS(fit_xgb,  file = paste0(model_path,"fit_xgb.rds"))
+
+# Guardar recipe preprocesado
+saveRDS(fit_log  , file = paste0(model_path, "workflow_log.rds"))
+saveRDS(fit_rf  , file = paste0(model_path, "workflow_rf.rds"))
+saveRDS(fit_xgb  , file = paste0(model_path, "workflow_xgb.rds"))
+```

@@ -5,18 +5,23 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
-
+### Importacion de librerias
 ```{R setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
 library(tidyverse)
 library(tidymodels)
 library(themis)
+library(here)
 set.seed(42)
 ```
 
 ## 1. Cargar datos
 
-```{R}
-loan_data <- read_csv("R-Clases/week-2/clase_9/storage/loan_status.csv")
+```{R load-dataset}
+
+path_loan_csv <- here("storage/loan_status.csv")
+loan_data <- read_csv(path_loan_csv)
 
 # Asegurar que Loan_Status sea factor
 loan_data <- loan_data %>%
@@ -29,9 +34,6 @@ glimpse(loan_data)
 ```
 
 ```{R target-variable}
-library(ggplot2)
-library(dplyr)
-
 # Contar cantidad de cada clase
 target_counts <- loan_data %>%
   count(Loan_Status) %>%
@@ -57,6 +59,10 @@ ggplot(target_counts, aes(x = 2, y = n, fill = Loan_Status)) +
 split <- initial_split(loan_data, prop = 0.8, strata = Loan_Status)
 train_data <- training(split)
 test_data <- testing(split)
+
+cat("\n Dimension estructural de la train data:\t",dim(train_data))
+cat("\n Dimension estructural de la train data:\t",dim(test_data))
+
 ```
 
 ## 3. Crear recipe para preprocesamiento
@@ -92,10 +98,10 @@ library(dials)
 
 rf_model <- rand_forest(
   mtry = tune(),    # <-- ahora sí se puede optimizar
-  trees = 2000,
+  trees = 100,
   min_n = tune()    # <-- optimizable
 ) %>%
-  set_engine("ranger", importance = "impurity") %>%
+  set_engine("ranger", importance = "impurity", verbose=TRUE) %>%
   set_mode("classification")
 
 ```
@@ -151,6 +157,26 @@ final_rf
 
 ```
 
+### 7.b Otencion de valores
+```{R valores-rf}
+target <- "Loan_Status"
+
+# Predecir con el modelo final
+rf_predictions <- predict(final_rf, test_data) %>%
+  bind_cols(test_data %>% select(target))  # target = variable real
+
+# Ver resultados
+head(rf_predictions)
+
+
+# # Matriz de confusión normal
+cm <- conf_mat(rf_predictions, truth = Loan_Status, estimate = .pred_class)
+
+cm
+
+```
+
+
 ## 8. Evaluar en test set
 
 ```{R}
@@ -166,8 +192,9 @@ rf_pred
 
 ## 8b. Calcular métricas adicionales sobre test set
 
-```{R}
-# Cargar metrics set
+```{R metricas}
+
+# Cargar metric set
 metrics_set <- metric_set(accuracy, f_meas, precision, recall)
 
 # Obtener predicciones de clase
@@ -176,9 +203,17 @@ rf_pred <- predict(final_rf, test_data, type = "prob") %>%
   bind_cols(test_data %>% select(Loan_Status)) %>%
   mutate(.pred_class = factor(ifelse(.pred_Y > threshold, "Y", "N")))
 
-# Calcular métricas
+# Calcular métricas de clase
 rf_metrics <- metrics_set(rf_pred, truth = Loan_Status, estimate = .pred_class)
-rf_metrics
+
+# Calcular ROC AUC
+rf_roc_auc <- roc_auc(rf_pred, truth = Loan_Status, .pred_Y, event_level = "second" )
+
+# Combinar resultados
+rf_metrics_all <- bind_rows(rf_metrics, rf_roc_auc)
+
+rf_metrics_all
+
 
 ```
 
@@ -186,14 +221,20 @@ rf_metrics
 ## 9. Gráfico ROC
 
 ```{R}
-positive_class <- "Y"  # o "1"
+
+positive_class <- "Y"
 pred_col <- paste0(".pred_", positive_class)
 
 rf_pred %>%
-  roc_curve(truth = Loan_Status, !!sym(pred_col)) %>%
+  roc_curve(
+    truth = Loan_Status,
+    !!sym(pred_col),
+    event_level = "second"   # asegura que "Y" sea la clase positiva
+  ) %>%
   autoplot() +
   ggtitle("ROC Curve - Random Forest") +
   theme_minimal()
+
 ```
 
 ## 10. Importancia de variables
@@ -205,8 +246,3 @@ final_rf %>%
   extract_fit_parsnip() %>%
   vip::vip()
 ```
-
-Credit_History ,
-ApplicantIncome
-LoanAmount
-CoapplicantIncome
