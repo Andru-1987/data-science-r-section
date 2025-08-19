@@ -1,4 +1,4 @@
-# Bank Marketing Classifier - Aplicación Shiny
+# Bank Marketing Classifier - Aplicación Shiny con Semilla Fija
 # Autor: Anderson Ocaña
 
 # Librerías necesarias
@@ -11,9 +11,13 @@ library(tidymodels)
 library(ggplot2)
 
 # Cargar modelos pre-entrenados (asumiendo que están guardados)
-fit_log <- readRDS("R-Clases/week-3/00_ProyectoR/models/fit_log.rds")
-fit_rf <- readRDS("R-Clases/week-3/00_ProyectoR/models/fit_rf.rds")
-fit_xgb <- readRDS("R-Clases/week-3/00_ProyectoR/models/fit_xgb.rds")
+base_path <- "R-Clases/week-3/00_ProyectoR/models/"
+
+
+
+fit_log <- readRDS( paste0(base_path,"fit_log.rds"))
+fit_rf <- readRDS(paste0(base_path,"fit_rf.rds"))
+fit_xgb <- readRDS(paste0(base_path,"fit_xgb.rds"))
 
 # Para demo, simularemos la estructura de datos
 demo_data <- data.frame(
@@ -210,9 +214,24 @@ ui <- dashboardPage(
 # SERVER
 server <- function(input, output, session) {
   
-  # Función simulada de predicción (reemplazar con modelos reales)
-  simulate_prediction <- function(model_type, data) {
-    # Simulación basada en algunas reglas lógicas
+  # Función para crear semilla fija basada en los datos de entrada
+  create_deterministic_seed <- function(data) {
+    # Convertir todos los valores a string y crear un hash simple
+    data_string <- paste(unlist(data), collapse = "")
+    # Crear semilla numérica basada en los caracteres ASCII
+    seed_value <- sum(utf8ToInt(data_string)) %% 100000
+    return(seed_value)
+  }
+  
+  # Función de predicción con semilla fija
+  simulate_prediction_fixed <- function(model_type, data) {
+    # Crear semilla basada en los datos de entrada (determinística)
+    seed_value <- create_deterministic_seed(data)
+    set.seed(seed_value)  # ✅ Semilla fija basada en datos
+    
+    # Mensaje de debug
+    cat("Semilla generada:", seed_value, "para modelo:", model_type, "\n")
+    
     score <- 0.3
     
     # Validar que los datos existen
@@ -224,13 +243,18 @@ server <- function(input, output, session) {
     if(!is.null(data$job) && data$job %in% c("management", "technician")) score <- score + 0.15
     if(!is.null(data$housing) && data$housing == FALSE) score <- score + 0.1
     if(!is.null(data$contact) && data$contact == "cellular") score <- score + 0.1
+    if(!is.null(data$education) && data$education == "tertiary") score <- score + 0.05
+    if(!is.null(data$interes_prestamo) && data$interes_prestamo == TRUE) score <- score + 0.08
     
-    # Ajustar según el modelo
-    set.seed(as.numeric(Sys.time()))
+    # Ajustar según el modelo (ahora con semilla fija)
     if(model_type == "rf") score <- score + runif(1, -0.1, 0.1)
     if(model_type == "xgb") score <- score + runif(1, -0.05, 0.15)
+    if(model_type == "logistic") score <- score + runif(1, -0.08, 0.08)
     
+    # Aplicar variación final (también con semilla fija)
     score <- max(0, min(1, score + runif(1, -0.1, 0.1)))
+    
+    cat("Probabilidad final:", round(score, 4), "\n")
     return(score)
   }
   
@@ -238,6 +262,7 @@ server <- function(input, output, session) {
   observeEvent(input$predict_btn, {
     
     # Mensaje de debug en consola
+    cat("========== NUEVA PREDICCIÓN ==========\n")
     cat("Botón presionado - iniciando predicción\n")
     
     # Recopilar datos del formulario
@@ -259,12 +284,13 @@ server <- function(input, output, session) {
     cat("Datos del cliente:\n")
     print(client_data)
     
-    # Realizar predicción simulada
-    prob_score <- simulate_prediction(input$model_choice, client_data)
+    # Realizar predicción con semilla fija
+    prob_score <- simulate_prediction_fixed(input$model_choice, client_data)
     prediction <- ifelse(prob_score >= 0.5, "ACEPTA", "RECHAZA")
     confidence <- round(prob_score * 100, 1)
     
-    cat("Probabilidad:", prob_score, "Predicción:", prediction, "\n")
+    cat("Resultado final - Probabilidad:", prob_score, "Predicción:", prediction, "\n")
+    cat("======================================\n")
     
     # Crear el HTML del resultado
     result_class <- ifelse(prediction == "ACEPTA", "accept", "reject")
@@ -273,6 +299,9 @@ server <- function(input, output, session) {
                         "rf" = "Random Forest", 
                         "xgb" = "XGBoost")
     
+    # Calcular semilla para mostrar al usuario
+    seed_display <- create_deterministic_seed(client_data)
+    
     # Actualizar la salida
     output$prediction_output <- renderUI({
       tagList(
@@ -280,12 +309,15 @@ server <- function(input, output, session) {
             h3(paste("Predicción:", prediction)),
             h4(paste("Probabilidad:", confidence, "%")),
             p(paste("Modelo utilizado:", model_name)),
+            p(paste("Semilla (reproducible):", seed_display), style = "font-size: 12px; color: #666;"),
             hr(),
             h5("Detalles del cliente:"),
             p(paste("Edad:", client_data$age, "años")),
             p(paste("Trabajo:", client_data$job)),
             p(paste("Balance:", client_data$balance, "€")),
-            p(paste("Contacto:", client_data$contact))
+            p(paste("Contacto:", client_data$contact)),
+            p(paste("Vivienda:", ifelse(client_data$housing, "Sí", "No"))),
+            p(paste("Préstamo:", ifelse(client_data$loan, "Sí", "No")))
         )
       )
     })
@@ -312,16 +344,19 @@ server <- function(input, output, session) {
   observeEvent(input$predict_batch, {
     if(nrow(demo_data) > 0) {
       predictions <- sapply(1:nrow(demo_data), function(i) {
-        simulate_prediction(input$batch_model, demo_data[i, ])
+        simulate_prediction_fixed(input$batch_model, demo_data[i, ])
       })
       
       batch_results <- demo_data %>%
         mutate(
           Probabilidad = round(predictions, 3),
           Prediccion = ifelse(predictions >= 0.5, "ACEPTA", "RECHAZA"),
-          Confianza = paste0(round(predictions * 100, 1), "%")
+          Confianza = paste0(round(predictions * 100, 1), "%"),
+          Semilla = sapply(1:nrow(demo_data), function(i) {
+            create_deterministic_seed(demo_data[i, ])
+          })
         ) %>%
-        select(age, job, balance, housing, loan, Probabilidad, Prediccion, Confianza)
+        select(age, job, balance, housing, loan, Probabilidad, Prediccion, Confianza, Semilla)
       
       output$batch_results <- DT::renderDataTable({
         DT::datatable(batch_results,
@@ -351,9 +386,9 @@ server <- function(input, output, session) {
       DT::formatRound(columns = 2:7, digits = 3)
   })
   
-  # Gráfico ROC simulado
+  # Gráfico ROC con semilla fija
   output$roc_plot <- renderPlotly({
-    set.seed(42)
+    set.seed(12345)  # Semilla fija para gráficos consistentes
     fpr <- seq(0, 1, length.out = 100)
     
     tpr_log <- pmin(1, fpr + runif(100, 0.1, 0.3))
@@ -380,8 +415,9 @@ server <- function(input, output, session) {
     ggplotly(p)
   })
   
-  # Gráfico de importancia de variables simulado
+  # Gráfico de importancia de variables con semilla fija
   output$importance_plot <- renderPlotly({
+    set.seed(54321)  # Semilla fija para consistencia
     importance_data <- data.frame(
       Variable = c("balance", "duration", "age", "contact_cellular", "job_management", 
                   "housing", "education_tertiary", "loan", "marital_married", "interes_prestamo"),
@@ -402,3 +438,6 @@ server <- function(input, output, session) {
 
 # Ejecutar la aplicación
 shinyApp(ui = ui, server = server, options = list(host = "0.0.0.0", port = 8080))
+
+
+
