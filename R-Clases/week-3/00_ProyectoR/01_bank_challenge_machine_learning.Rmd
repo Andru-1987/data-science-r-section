@@ -30,10 +30,13 @@ output: html_document
 packages <- c(
   "DBI", "RSQLite", "dplyr", "tidymodels", "reshape2", "DataExplorer",
   "skimr", "patchwork", "themis", "ranger", "R.utils", "xgboost","randomForest",
-  "ggplot2", "plotly", "corrplot"
+  "ggplot2", "plotly", "corrplot", "glmnet","shinydashboard", "DT"
 )
 
 install.packages(setdiff(packages, installed.packages()))
+```
+
+```{R load-dependecies}
 
 library(DBI)
 library(RSQLite)
@@ -112,9 +115,14 @@ glimpse(df)
 
 #### Verificación de nulos
 
+```{R root-assets}
+root <- "R-Clases/week-3/00_ProyectoR/assets/"
+```
 ```{R missing-values}
 print("Validacion si tenemos datos nulos")
+png( paste0(root,"missing_values.png"), width = 800, height = 600)
 plot_missing(df)
+dev.off()
 ```
 
 ####  Categorizacion de data qualitativa
@@ -272,7 +280,7 @@ class_weights <- c('0' = 1, '1' = n_neg / n_pos)
 
 rf_model_weighted <- rand_forest(
   mode = "classification",
-  trees = 100,
+  trees = 200,
   mtry = 3,
   min_n = 5
 ) %>% 
@@ -284,7 +292,7 @@ scale_pos <- n_neg / n_pos
 
 xgb_model_weighted <- boost_tree(
   mode = "classification",
-  trees = 100,
+  trees = 200,
   tree_depth = 3,
   learn_rate = 0.2,
   min_n = 5,
