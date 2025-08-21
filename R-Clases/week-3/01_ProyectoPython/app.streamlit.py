@@ -4,6 +4,7 @@ import pandas as pd
 import joblib
 import os
 from utils.preprocessing import clean_columns_global, map_bins,to_numeric
+
 # app.py
 import streamlit as st
 import pandas as pd
@@ -61,7 +62,9 @@ selected_model_file = st.sidebar.selectbox("Selecciona un modelo", model_files)
 
 # Cargar pipeline completo
 model = joblib.load(os.path.join("models", selected_model_file))
-st.sidebar.success(f"✅ Modelo cargado: {selected_model_file}")
+
+nombre_comercial = " ".join( selected_model_file.split("_") ).upper().replace(".PKL","")
+st.sidebar.success(f"✅ Modelo cargado: {nombre_comercial}")
 
 # --- Subida de datos ---
 uploaded_file = st.file_uploader("Sube un CSV con datos de clientes", type=["csv"])
